@@ -1,0 +1,26 @@
+{
+  "name": "upwork-proposal-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "API for Upwork proposal manager (offline-first sync)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "migrate": "node migrations/migrate.js",
+    "seed": "node migrations/seed.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "express-validator": "^7.2.1",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.14.1",
+    "uuid": "^11.1.0"
+  }
+}

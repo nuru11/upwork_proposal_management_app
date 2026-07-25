@@ -1,0 +1,22 @@
+# Dependencies & build
+node_modules/
+**/node_modules/
+**/build/
+**/.dart_tool/
+**/.pub-cache/
+**/.pub/
+
+# Secrets
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.iml
