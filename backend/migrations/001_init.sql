@@ -13,11 +13,13 @@ CREATE TABLE IF NOT EXISTS templates (
   name VARCHAR(255) NOT NULL,
   body MEDIUMTEXT NOT NULL,
   language VARCHAR(32) NOT NULL,
+  project_type VARCHAR(32) NOT NULL,
   is_favorite TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   deleted_at DATETIME(3) NULL,
   KEY idx_templates_user_id (user_id),
+  KEY idx_templates_project_type (project_type),
   KEY idx_templates_updated_at (updated_at),
   CONSTRAINT fk_templates_user
     FOREIGN KEY (user_id) REFERENCES users (id)
@@ -33,6 +35,7 @@ CREATE TABLE IF NOT EXISTS proposals (
   body MEDIUMTEXT NOT NULL,
   language VARCHAR(32) NOT NULL,
   status VARCHAR(32) NOT NULL,
+  project_type VARCHAR(32) NOT NULL,
   template_id CHAR(36) NULL,
   notes TEXT NULL,
   created_at DATETIME(3) NOT NULL,
@@ -42,6 +45,7 @@ CREATE TABLE IF NOT EXISTS proposals (
   KEY idx_proposals_user_id (user_id),
   KEY idx_proposals_status (status),
   KEY idx_proposals_language (language),
+  KEY idx_proposals_project_type (project_type),
   KEY idx_proposals_updated_at (updated_at),
   CONSTRAINT fk_proposals_user
     FOREIGN KEY (user_id) REFERENCES users (id)

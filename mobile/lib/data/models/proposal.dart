@@ -38,6 +38,25 @@ enum ProposalStatus {
   }
 }
 
+enum ProposalProjectType {
+  mobileApp,
+  storeUpload,
+  other;
+
+  String get label => switch (this) {
+        ProposalProjectType.mobileApp => 'Mobile app',
+        ProposalProjectType.storeUpload => 'Play Store & App Store upload',
+        ProposalProjectType.other => 'Other',
+      };
+
+  static ProposalProjectType fromStorage(String value) {
+    return ProposalProjectType.values.firstWhere(
+      (e) => e.name == value,
+      orElse: () => ProposalProjectType.other,
+    );
+  }
+}
+
 class Proposal {
   const Proposal({
     required this.id,
@@ -47,6 +66,7 @@ class Proposal {
     required this.body,
     required this.language,
     required this.status,
+    required this.projectType,
     this.templateId,
     this.notes,
     required this.createdAt,
@@ -61,6 +81,7 @@ class Proposal {
   final String body;
   final ProposalLanguage language;
   final ProposalStatus status;
+  final ProposalProjectType projectType;
   final String? templateId;
   final String? notes;
   final DateTime createdAt;
@@ -75,6 +96,7 @@ class Proposal {
     String? body,
     ProposalLanguage? language,
     ProposalStatus? status,
+    ProposalProjectType? projectType,
     String? templateId,
     String? notes,
     DateTime? createdAt,
@@ -94,6 +116,7 @@ class Proposal {
       body: body ?? this.body,
       language: language ?? this.language,
       status: status ?? this.status,
+      projectType: projectType ?? this.projectType,
       templateId: clearTemplateId ? null : (templateId ?? this.templateId),
       notes: clearNotes ? null : (notes ?? this.notes),
       createdAt: createdAt ?? this.createdAt,
@@ -111,6 +134,7 @@ class Proposal {
       'body': body,
       'language': language.name,
       'status': status.name,
+      'project_type': projectType.name,
       'template_id': templateId,
       'notes': notes,
       'created_at': createdAt.toIso8601String(),
@@ -128,6 +152,9 @@ class Proposal {
       body: map['body'] as String,
       language: ProposalLanguage.fromStorage(map['language'] as String),
       status: ProposalStatus.fromStorage(map['status'] as String),
+      projectType: ProposalProjectType.fromStorage(
+        (map['project_type'] as String?) ?? 'other',
+      ),
       templateId: map['template_id'] as String?,
       notes: map['notes'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
@@ -147,6 +174,7 @@ class Proposal {
       'body': body,
       'language': language.name,
       'status': status.name,
+      'projectType': projectType.name,
       'templateId': templateId,
       'notes': notes,
       'createdAt': createdAt.toIso8601String(),
@@ -164,6 +192,9 @@ class Proposal {
       body: json['body'] as String,
       language: ProposalLanguage.fromStorage(json['language'] as String),
       status: ProposalStatus.fromStorage(json['status'] as String),
+      projectType: ProposalProjectType.fromStorage(
+        (json['projectType'] as String?) ?? 'other',
+      ),
       templateId: json['templateId'] as String?,
       notes: json['notes'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),

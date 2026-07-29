@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'features/auth/login_screen.dart';
+import 'features/profile/profile_screen.dart';
+import 'features/profile/project_form_screen.dart';
+import 'features/profile/projects_list_screen.dart';
 import 'features/proposals/proposal_detail_screen.dart';
 import 'features/proposals/proposal_form_screen.dart';
 import 'features/proposals/proposals_list_screen.dart';
@@ -111,6 +114,35 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/profile',
+                builder: (context, state) => const ProfileScreen(),
+                routes: [
+                  GoRoute(
+                    parentNavigatorKey: _rootNavigatorKey,
+                    path: 'projects',
+                    builder: (context, state) => const ProjectsListScreen(),
+                    routes: [
+                      GoRoute(
+                        parentNavigatorKey: _rootNavigatorKey,
+                        path: 'new',
+                        builder: (context, state) => const ProjectFormScreen(),
+                      ),
+                      GoRoute(
+                        parentNavigatorKey: _rootNavigatorKey,
+                        path: ':id/edit',
+                        builder: (context, state) => ProjectFormScreen(
+                          projectId: state.pathParameters['id'],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     ],
@@ -151,6 +183,11 @@ class AppShell extends ConsumerWidget {
             icon: Icon(Icons.insights_outlined),
             selectedIcon: Icon(Icons.insights),
             label: 'Stats',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
           ),
         ],
       ),

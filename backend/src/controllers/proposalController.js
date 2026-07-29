@@ -5,6 +5,7 @@ async function list(req, res) {
     const items = await proposalService.list(req.user.id, {
       status: req.query.status,
       language: req.query.language,
+      projectType: req.query.projectType,
       search: req.query.search,
     });
     return res.json(items);

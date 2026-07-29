@@ -142,6 +142,33 @@ class _ProposalsListScreenState extends ConsumerState<ProposalsListScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 44,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                _FilterChip(
+                  label: 'All types',
+                  selected: filter.projectType == null,
+                  onSelected: () => ref
+                      .read(proposalFilterProvider.notifier)
+                      .setProjectType(null),
+                ),
+                ...ProposalProjectType.values.map(
+                  (type) => _FilterChip(
+                    label: type.label,
+                    selected: filter.projectType == type,
+                    color: AppColors.blue,
+                    onSelected: () => ref
+                        .read(proposalFilterProvider.notifier)
+                        .setProjectType(type),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           Expanded(
             child: proposalsAsync.when(
@@ -151,6 +178,7 @@ class _ProposalsListScreenState extends ConsumerState<ProposalsListScreen> {
                 if (proposals.isEmpty) {
                   final hasFilters = filter.status != null ||
                       filter.language != null ||
+                      filter.projectType != null ||
                       filter.search.isNotEmpty;
                   return EmptyState(
                     icon: Icons.description_outlined,
@@ -275,11 +303,16 @@ class _ProposalTile extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 10),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   StatusChip(status: proposal.status, compact: true),
-                  const SizedBox(width: 8),
                   LanguageChip(language: proposal.language),
+                  ProjectTypeChip(
+                    projectType: proposal.projectType,
+                    compact: true,
+                  ),
                 ],
               ),
             ],

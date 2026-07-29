@@ -4,8 +4,15 @@ const mysql = require('mysql2/promise');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 async function migrate() {
-  const sqlPath = path.join(__dirname, '001_init.sql');
-  const sql = fs.readFileSync(sqlPath, 'utf8');
+  const migrationsDir = __dirname;
+  const files = fs
+    .readdirSync(migrationsDir)
+    .filter((name) => /^\d+_.*\.sql$/i.test(name))
+    .sort();
+
+  if (files.length === 0) {
+    throw new Error('No migration SQL files found');
+  }
 
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST,
@@ -17,7 +24,12 @@ async function migrate() {
   });
 
   try {
-    await connection.query(sql);
+    for (const file of files) {
+      const sqlPath = path.join(migrationsDir, file);
+      const sql = fs.readFileSync(sqlPath, 'utf8');
+      await connection.query(sql);
+      console.log(`Applied ${file}`);
+    }
     console.log('Migration completed successfully.');
   } finally {
     await connection.end();

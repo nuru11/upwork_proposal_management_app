@@ -1,7 +1,7 @@
 const { query } = require('../config/db');
 const Proposal = require('../models/Proposal');
 
-async function list(userId, { status, language, search } = {}) {
+async function list(userId, { status, language, projectType, search } = {}) {
   const where = ['user_id = ?', 'deleted_at IS NULL'];
   const params = [userId];
 
@@ -12,6 +12,10 @@ async function list(userId, { status, language, search } = {}) {
   if (language) {
     where.push('language = ?');
     params.push(language);
+  }
+  if (projectType) {
+    where.push('project_type = ?');
+    params.push(projectType);
   }
   if (search && search.trim()) {
     where.push('(title LIKE ? OR client_name LIKE ? OR body LIKE ?)');
@@ -39,8 +43,8 @@ async function getById(userId, id) {
 }
 
 async function create(userId, payload) {
-  if (!payload.id || !payload.title || !payload.body) {
-    const err = new Error('id, title, and body are required');
+  if (!payload.id || !payload.title || !payload.body || !payload.projectType) {
+    const err = new Error('id, title, body, and projectType are required');
     err.status = 400;
     throw err;
   }
@@ -49,6 +53,7 @@ async function create(userId, payload) {
     ...payload,
     language: payload.language || 'english',
     status: payload.status || 'submitted',
+    projectType: payload.projectType,
     createdAt: payload.createdAt || new Date().toISOString(),
     updatedAt: payload.updatedAt || new Date().toISOString(),
   });
@@ -56,8 +61,9 @@ async function create(userId, payload) {
   await query(
     `INSERT INTO proposals (
       id, user_id, title, client_name, job_url, body, language, status,
-      template_id, notes, created_at, updated_at, submitted_at, deleted_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+      project_type, template_id, notes, created_at, updated_at, submitted_at,
+      deleted_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
     ON DUPLICATE KEY UPDATE
       title = VALUES(title),
       client_name = VALUES(client_name),
@@ -65,6 +71,7 @@ async function create(userId, payload) {
       body = VALUES(body),
       language = VALUES(language),
       status = VALUES(status),
+      project_type = VALUES(project_type),
       template_id = VALUES(template_id),
       notes = VALUES(notes),
       updated_at = VALUES(updated_at),
@@ -79,6 +86,7 @@ async function create(userId, payload) {
       cols.body,
       cols.language,
       cols.status,
+      cols.project_type,
       cols.template_id,
       cols.notes,
       cols.created_at,
@@ -109,8 +117,8 @@ async function update(userId, id, payload) {
   await query(
     `UPDATE proposals SET
       title = ?, client_name = ?, job_url = ?, body = ?, language = ?,
-      status = ?, template_id = ?, notes = ?, updated_at = ?, submitted_at = ?,
-      deleted_at = NULL
+      status = ?, project_type = ?, template_id = ?, notes = ?,
+      updated_at = ?, submitted_at = ?, deleted_at = NULL
      WHERE id = ? AND user_id = ?`,
     [
       cols.title,
@@ -119,6 +127,7 @@ async function update(userId, id, payload) {
       cols.body,
       cols.language,
       cols.status,
+      cols.project_type,
       cols.template_id,
       cols.notes,
       cols.updated_at,

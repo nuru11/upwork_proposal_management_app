@@ -2,6 +2,7 @@ const express = require('express');
 const authRoutes = require('./authRoutes');
 const proposalRoutes = require('./proposalRoutes');
 const templateRoutes = require('./templateRoutes');
+const projectRoutes = require('./projectRoutes');
 const syncController = require('../controllers/syncController');
 const { authRequired } = require('../middleware/auth');
 
@@ -14,6 +15,7 @@ router.get('/health', (_req, res) => {
 router.use('/auth', authRoutes);
 router.use('/proposals', proposalRoutes);
 router.use('/templates', templateRoutes);
+router.use('/projects', projectRoutes);
 router.get('/sync', authRequired, syncController.sync);
 
 module.exports = router;

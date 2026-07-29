@@ -1,11 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/db/app_database.dart';
+import '../data/models/project.dart';
 import '../data/models/proposal.dart';
 import '../data/models/template.dart';
 import '../data/remote/api_client.dart';
+import '../data/remote/project_api.dart';
 import '../data/remote/proposal_api.dart';
 import '../data/remote/template_api.dart';
+import '../data/repositories/project_repository.dart';
 import '../data/repositories/proposal_repository.dart';
 import '../data/repositories/template_repository.dart';
 import '../data/sync/connectivity_service.dart';
@@ -32,6 +35,10 @@ final templateRepositoryProvider = Provider<TemplateRepository>((ref) {
   return TemplateRepository(ref.watch(appDatabaseProvider));
 });
 
+final projectRepositoryProvider = Provider<ProjectRepository>((ref) {
+  return ProjectRepository(ref.watch(appDatabaseProvider));
+});
+
 final syncQueueRepositoryProvider = Provider<SyncQueueRepository>((ref) {
   return SyncQueueRepository(ref.watch(appDatabaseProvider));
 });
@@ -42,8 +49,10 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     apiClient: api,
     proposalApi: ProposalApi(api),
     templateApi: TemplateApi(api),
+    projectApi: ProjectApi(api),
     proposalRepository: ref.watch(proposalRepositoryProvider),
     templateRepository: ref.watch(templateRepositoryProvider),
+    projectRepository: ref.watch(projectRepositoryProvider),
     syncQueueRepository: ref.watch(syncQueueRepositoryProvider),
     connectivityService: ref.watch(connectivityServiceProvider),
   );
@@ -111,6 +120,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       ref.read(syncServiceProvider).syncNow().then((_) {
         ref.read(proposalsProvider.notifier).refresh();
         ref.read(templatesProvider.notifier).refresh();
+        ref.read(projectsProvider.notifier).refresh();
       });
       return true;
     } catch (e) {
@@ -136,6 +146,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     await ref.read(syncServiceProvider).syncNow();
     await ref.read(proposalsProvider.notifier).refresh();
     await ref.read(templatesProvider.notifier).refresh();
+    await ref.read(projectsProvider.notifier).refresh();
   }
 }
 
@@ -147,23 +158,29 @@ class ProposalFilter {
   const ProposalFilter({
     this.status,
     this.language,
+    this.projectType,
     this.search = '',
   });
 
   final ProposalStatus? status;
   final ProposalLanguage? language;
+  final ProposalProjectType? projectType;
   final String search;
 
   ProposalFilter copyWith({
     ProposalStatus? status,
     ProposalLanguage? language,
+    ProposalProjectType? projectType,
     String? search,
     bool clearStatus = false,
     bool clearLanguage = false,
+    bool clearProjectType = false,
   }) {
     return ProposalFilter(
       status: clearStatus ? null : (status ?? this.status),
       language: clearLanguage ? null : (language ?? this.language),
+      projectType:
+          clearProjectType ? null : (projectType ?? this.projectType),
       search: search ?? this.search,
     );
   }
@@ -173,11 +190,12 @@ class ProposalFilter {
     return other is ProposalFilter &&
         other.status == status &&
         other.language == language &&
+        other.projectType == projectType &&
         other.search == search;
   }
 
   @override
-  int get hashCode => Object.hash(status, language, search);
+  int get hashCode => Object.hash(status, language, projectType, search);
 }
 
 class ProposalFilterNotifier extends Notifier<ProposalFilter> {
@@ -192,6 +210,13 @@ class ProposalFilterNotifier extends Notifier<ProposalFilter> {
     state = state.copyWith(language: language, clearLanguage: language == null);
   }
 
+  void setProjectType(ProposalProjectType? projectType) {
+    state = state.copyWith(
+      projectType: projectType,
+      clearProjectType: projectType == null,
+    );
+  }
+
   void setSearch(String search) {
     state = state.copyWith(search: search);
   }
@@ -204,6 +229,49 @@ final proposalFilterProvider =
   ProposalFilterNotifier.new,
 );
 
+class TemplateFilter {
+  const TemplateFilter({this.projectType});
+
+  final ProposalProjectType? projectType;
+
+  TemplateFilter copyWith({
+    ProposalProjectType? projectType,
+    bool clearProjectType = false,
+  }) {
+    return TemplateFilter(
+      projectType:
+          clearProjectType ? null : (projectType ?? this.projectType),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TemplateFilter && other.projectType == projectType;
+  }
+
+  @override
+  int get hashCode => projectType.hashCode;
+}
+
+class TemplateFilterNotifier extends Notifier<TemplateFilter> {
+  @override
+  TemplateFilter build() => const TemplateFilter();
+
+  void setProjectType(ProposalProjectType? projectType) {
+    state = state.copyWith(
+      projectType: projectType,
+      clearProjectType: projectType == null,
+    );
+  }
+
+  void clear() => state = const TemplateFilter();
+}
+
+final templateFilterProvider =
+    NotifierProvider<TemplateFilterNotifier, TemplateFilter>(
+  TemplateFilterNotifier.new,
+);
+
 class ProposalsNotifier extends AsyncNotifier<List<Proposal>> {
   @override
   Future<List<Proposal>> build() async {
@@ -211,6 +279,7 @@ class ProposalsNotifier extends AsyncNotifier<List<Proposal>> {
     return ref.read(proposalRepositoryProvider).getAll(
           status: filter.status,
           language: filter.language,
+          projectType: filter.projectType,
           search: filter.search,
         );
   }
@@ -222,6 +291,7 @@ class ProposalsNotifier extends AsyncNotifier<List<Proposal>> {
       () => ref.read(proposalRepositoryProvider).getAll(
             status: filter.status,
             language: filter.language,
+            projectType: filter.projectType,
             search: filter.search,
           ),
     );
@@ -270,13 +340,19 @@ final proposalByIdProvider =
 class TemplatesNotifier extends AsyncNotifier<List<ProposalTemplate>> {
   @override
   Future<List<ProposalTemplate>> build() {
-    return ref.read(templateRepositoryProvider).getAll();
+    final filter = ref.watch(templateFilterProvider);
+    return ref.read(templateRepositoryProvider).getAll(
+          projectType: filter.projectType,
+        );
   }
 
   Future<void> refresh() async {
+    final filter = ref.read(templateFilterProvider);
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () => ref.read(templateRepositoryProvider).getAll(),
+      () => ref.read(templateRepositoryProvider).getAll(
+            projectType: filter.projectType,
+          ),
     );
   }
 
@@ -317,6 +393,89 @@ final templateByIdProvider =
     FutureProvider.family<ProposalTemplate?, String>((ref, id) async {
   ref.watch(templatesProvider);
   return ref.read(templateRepositoryProvider).getById(id);
+});
+
+class ProjectFilter {
+  const ProjectFilter({this.type});
+
+  final ProjectType? type;
+
+  ProjectFilter copyWith({
+    ProjectType? type,
+    bool clearType = false,
+  }) {
+    return ProjectFilter(
+      type: clearType ? null : (type ?? this.type),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ProjectFilter && other.type == type;
+  }
+
+  @override
+  int get hashCode => type.hashCode;
+}
+
+class ProjectFilterNotifier extends Notifier<ProjectFilter> {
+  @override
+  ProjectFilter build() => const ProjectFilter();
+
+  void setType(ProjectType? type) {
+    state = ProjectFilter(type: type);
+  }
+
+  void clear() => state = const ProjectFilter();
+}
+
+final projectFilterProvider =
+    NotifierProvider<ProjectFilterNotifier, ProjectFilter>(
+  ProjectFilterNotifier.new,
+);
+
+class ProjectsNotifier extends AsyncNotifier<List<Project>> {
+  @override
+  Future<List<Project>> build() {
+    final filter = ref.watch(projectFilterProvider);
+    return ref.read(projectRepositoryProvider).getAll(type: filter.type);
+  }
+
+  Future<void> refresh() async {
+    final filter = ref.read(projectFilterProvider);
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => ref.read(projectRepositoryProvider).getAll(type: filter.type),
+    );
+  }
+
+  Future<void> save(Project project, {required bool isNew}) async {
+    final repo = ref.read(projectRepositoryProvider);
+    if (isNew) {
+      await repo.insert(project);
+    } else {
+      await repo.update(project);
+    }
+    await ref.read(syncServiceProvider).pushProjectUpsert(project);
+    await refresh();
+  }
+
+  Future<void> delete(String id) async {
+    await ref.read(projectRepositoryProvider).delete(id);
+    await ref.read(syncServiceProvider).pushProjectDelete(id);
+    await refresh();
+  }
+}
+
+final projectsProvider =
+    AsyncNotifierProvider<ProjectsNotifier, List<Project>>(
+  ProjectsNotifier.new,
+);
+
+final projectByIdProvider =
+    FutureProvider.family<Project?, String>((ref, id) async {
+  ref.watch(projectsProvider);
+  return ref.read(projectRepositoryProvider).getById(id);
 });
 
 class StatsSnapshot {

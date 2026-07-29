@@ -11,11 +11,26 @@ class TemplateRepository {
 
   Database get _db => _appDatabase.database;
 
-  Future<List<ProposalTemplate>> getAll({ProposalLanguage? language}) async {
+  Future<List<ProposalTemplate>> getAll({
+    ProposalLanguage? language,
+    ProposalProjectType? projectType,
+  }) async {
+    final where = <String>[];
+    final args = <Object?>[];
+
+    if (language != null) {
+      where.add('language = ?');
+      args.add(language.name);
+    }
+    if (projectType != null) {
+      where.add('project_type = ?');
+      args.add(projectType.name);
+    }
+
     final rows = await _db.query(
       'templates',
-      where: language == null ? null : 'language = ?',
-      whereArgs: language == null ? null : [language.name],
+      where: where.isEmpty ? null : where.join(' AND '),
+      whereArgs: where.isEmpty ? null : args,
       orderBy: 'is_favorite DESC, updated_at DESC',
     );
     return rows.map(ProposalTemplate.fromMap).toList();

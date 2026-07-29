@@ -25,6 +25,7 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
   final _bodyController = TextEditingController();
 
   ProposalLanguage _language = ProposalLanguage.english;
+  ProposalProjectType _projectType = ProposalProjectType.mobileApp;
   bool _isFavorite = false;
   bool _loaded = false;
   bool _saving = false;
@@ -41,6 +42,7 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
     _nameController.text = template.name;
     _bodyController.text = template.body;
     _language = template.language;
+    _projectType = template.projectType;
     _isFavorite = template.isFavorite;
     _loaded = true;
   }
@@ -55,6 +57,7 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
       name: _nameController.text.trim(),
       body: _bodyController.text.trim(),
       language: _language,
+      projectType: _projectType,
       isFavorite: _isFavorite,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
@@ -140,6 +143,30 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
                 }
                 return null;
               },
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Project type *',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: ProposalProjectType.values.map((type) {
+                final selected = _projectType == type;
+                return ChoiceChip(
+                  label: Text(type.label),
+                  selected: selected,
+                  selectedColor: AppColors.blueSoft,
+                  labelStyle: TextStyle(
+                    color: selected ? AppColors.blue : AppColors.slate700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  onSelected: (_) => setState(() => _projectType = type),
+                  showCheckmark: false,
+                );
+              }).toList(),
             ),
             const SizedBox(height: 16),
             Text('Language', style: Theme.of(context).textTheme.titleMedium),

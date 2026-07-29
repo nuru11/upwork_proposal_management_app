@@ -2,12 +2,20 @@ const { query } = require('../config/db');
 const Template = require('../models/Template');
 const { toMysqlDatetime } = require('../models/Proposal');
 
-async function list(userId) {
+async function list(userId, { projectType } = {}) {
+  const where = ['user_id = ?', 'deleted_at IS NULL'];
+  const params = [userId];
+
+  if (projectType) {
+    where.push('project_type = ?');
+    params.push(projectType);
+  }
+
   const rows = await query(
     `SELECT * FROM templates
-     WHERE user_id = ? AND deleted_at IS NULL
+     WHERE ${where.join(' AND ')}
      ORDER BY is_favorite DESC, updated_at DESC`,
-    [userId],
+    params,
   );
   return rows.map(Template.fromRow);
 }
@@ -23,8 +31,8 @@ async function getById(userId, id) {
 }
 
 async function create(userId, payload) {
-  if (!payload.id || !payload.name || !payload.body) {
-    const err = new Error('id, name, and body are required');
+  if (!payload.id || !payload.name || !payload.body || !payload.projectType) {
+    const err = new Error('id, name, body, and projectType are required');
     err.status = 400;
     throw err;
   }
@@ -32,6 +40,7 @@ async function create(userId, payload) {
   const cols = Template.toDbColumns({
     ...payload,
     language: payload.language || 'english',
+    projectType: payload.projectType,
     isFavorite: Boolean(payload.isFavorite),
     createdAt: payload.createdAt || new Date().toISOString(),
     updatedAt: payload.updatedAt || new Date().toISOString(),
@@ -39,13 +48,14 @@ async function create(userId, payload) {
 
   await query(
     `INSERT INTO templates (
-      id, user_id, name, body, language, is_favorite,
+      id, user_id, name, body, language, project_type, is_favorite,
       created_at, updated_at, deleted_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
     ON DUPLICATE KEY UPDATE
       name = VALUES(name),
       body = VALUES(body),
       language = VALUES(language),
+      project_type = VALUES(project_type),
       is_favorite = VALUES(is_favorite),
       updated_at = VALUES(updated_at),
       deleted_at = NULL`,
@@ -55,6 +65,7 @@ async function create(userId, payload) {
       cols.name,
       cols.body,
       cols.language,
+      cols.project_type,
       cols.is_favorite,
       cols.created_at,
       cols.updated_at,
@@ -82,13 +93,14 @@ async function update(userId, id, payload) {
 
   await query(
     `UPDATE templates SET
-      name = ?, body = ?, language = ?, is_favorite = ?,
+      name = ?, body = ?, language = ?, project_type = ?, is_favorite = ?,
       updated_at = ?, deleted_at = NULL
      WHERE id = ? AND user_id = ?`,
     [
       cols.name,
       cols.body,
       cols.language,
+      cols.project_type,
       cols.is_favorite,
       cols.updated_at,
       id,

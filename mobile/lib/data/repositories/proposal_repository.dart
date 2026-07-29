@@ -13,6 +13,7 @@ class ProposalRepository {
   Future<List<Proposal>> getAll({
     ProposalStatus? status,
     ProposalLanguage? language,
+    ProposalProjectType? projectType,
     String? search,
   }) async {
     final where = <String>[];
@@ -25,6 +26,10 @@ class ProposalRepository {
     if (language != null) {
       where.add('language = ?');
       args.add(language.name);
+    }
+    if (projectType != null) {
+      where.add('project_type = ?');
+      args.add(projectType.name);
     }
     if (search != null && search.trim().isNotEmpty) {
       where.add('(title LIKE ? OR client_name LIKE ? OR body LIKE ?)');

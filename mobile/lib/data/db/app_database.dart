@@ -10,7 +10,7 @@ class AppDatabase {
   Database get database => _db;
 
   static const _dbName = 'proposal_manager.db';
-  static const _dbVersion = 2;
+  static const _dbVersion = 6;
 
   static Future<AppDatabase> open() async {
     final documents = await getApplicationDocumentsDirectory();
@@ -31,11 +31,16 @@ class AppDatabase {
         name TEXT NOT NULL,
         body TEXT NOT NULL,
         language TEXT NOT NULL,
+        project_type TEXT NOT NULL DEFAULT 'other',
         is_favorite INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
     ''');
+
+    await db.execute(
+      'CREATE INDEX idx_templates_project_type ON templates(project_type)',
+    );
 
     await db.execute('''
       CREATE TABLE proposals (
@@ -46,6 +51,7 @@ class AppDatabase {
         body TEXT NOT NULL,
         language TEXT NOT NULL,
         status TEXT NOT NULL,
+        project_type TEXT NOT NULL DEFAULT 'other',
         template_id TEXT,
         notes TEXT,
         created_at TEXT NOT NULL,
@@ -62,7 +68,11 @@ class AppDatabase {
     await db.execute(
       'CREATE INDEX idx_proposals_language ON proposals(language)',
     );
+    await db.execute(
+      'CREATE INDEX idx_proposals_project_type ON proposals(project_type)',
+    );
 
+    await _createProjects(db);
     await _createSyncQueue(db);
   }
 
@@ -73,6 +83,53 @@ class AppDatabase {
   ) async {
     if (oldVersion < 2) {
       await _createSyncQueue(db);
+    }
+    if (oldVersion < 3) {
+      await db.execute(
+        "ALTER TABLE proposals ADD COLUMN project_type TEXT NOT NULL DEFAULT 'other'",
+      );
+      await db.execute(
+        'CREATE INDEX idx_proposals_project_type ON proposals(project_type)',
+      );
+    }
+    if (oldVersion < 4) {
+      await db.execute(
+        "ALTER TABLE templates ADD COLUMN project_type TEXT NOT NULL DEFAULT 'other'",
+      );
+      await db.execute(
+        'CREATE INDEX idx_templates_project_type ON templates(project_type)',
+      );
+    }
+    if (oldVersion < 5) {
+      await _createProjects(db);
+    }
+    if (oldVersion < 6) {
+      await _addProjectTypesColumn(db);
+    }
+  }
+
+  static Future<void> _createProjects(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        play_store_url TEXT,
+        app_store_url TEXT,
+        web_url TEXT,
+        types TEXT NOT NULL DEFAULT '["other"]',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  static Future<void> _addProjectTypesColumn(Database db) async {
+    final info = await db.rawQuery('PRAGMA table_info(projects)');
+    final hasTypes = info.any((row) => row['name'] == 'types');
+    if (!hasTypes) {
+      await db.execute(
+        'ALTER TABLE projects ADD COLUMN types TEXT NOT NULL DEFAULT \'["other"]\'',
+      );
     }
   }
 

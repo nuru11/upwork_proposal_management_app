@@ -29,6 +29,7 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
 
   ProposalLanguage _language = ProposalLanguage.english;
   ProposalStatus _status = ProposalStatus.submitted;
+  ProposalProjectType _projectType = ProposalProjectType.mobileApp;
   String? _templateId;
   String? _templateName;
   bool _loaded = false;
@@ -53,12 +54,13 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
     _notesController.text = proposal.notes ?? '';
     _language = proposal.language;
     _status = proposal.status;
+    _projectType = proposal.projectType;
     _templateId = proposal.templateId;
     _loaded = true;
   }
 
   Future<void> _pickTemplate() async {
-    final templates = await ref.read(templatesProvider.future);
+    final templates = await ref.read(templateRepositoryProvider).getAll();
     if (!mounted) return;
 
     if (templates.isEmpty) {
@@ -107,7 +109,7 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
                           ),
                           title: Text(template.name),
                           subtitle: Text(
-                            '${template.language.label}'
+                            '${template.projectType.label} · ${template.language.label}'
                             '${template.isFavorite ? ' · Favorite' : ''}',
                           ),
                           trailing: const Icon(Icons.chevron_right),
@@ -129,6 +131,7 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
     setState(() {
       _bodyController.text = selected.body;
       _language = selected.language;
+      _projectType = selected.projectType;
       _templateId = selected.id;
       _templateName = selected.name;
     });
@@ -151,6 +154,7 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
       body: _bodyController.text.trim(),
       language: _language,
       status: _status,
+      projectType: _projectType,
       templateId: _templateId,
       notes: _notesController.text.trim().isEmpty
           ? null
@@ -281,6 +285,30 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
                 hintText: 'https://www.upwork.com/jobs/...',
               ),
               keyboardType: TextInputType.url,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Project type *',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: ProposalProjectType.values.map((type) {
+                final selected = _projectType == type;
+                return ChoiceChip(
+                  label: Text(type.label),
+                  selected: selected,
+                  selectedColor: AppColors.blueSoft,
+                  labelStyle: TextStyle(
+                    color: selected ? AppColors.blue : AppColors.slate700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  onSelected: (_) => setState(() => _projectType = type),
+                  showCheckmark: false,
+                );
+              }).toList(),
             ),
             const SizedBox(height: 16),
             Text('Language', style: Theme.of(context).textTheme.titleMedium),

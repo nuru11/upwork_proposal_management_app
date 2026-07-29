@@ -54,17 +54,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Center(
+                      child: Image.asset(
+                        'assets/logo/logo.png',
+                        width: 96,
+                        height: 96,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                     Text(
                       'Proposal Manager',
                       style: Theme.of(context).textTheme.headlineMedium,
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'Sign in to sync across devices. Offline use still works after login.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                      textAlign: TextAlign.center,
-                    ),
+                    // Text(
+                    //   'Sign in to sync across devices. Offline use still works after login.',
+                    //   style: Theme.of(context).textTheme.bodyMedium,
+                    //   textAlign: TextAlign.center,
+                    // ),
                     const SizedBox(height: 32),
                     TextFormField(
                       controller: _usernameController,

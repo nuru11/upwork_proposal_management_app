@@ -2,7 +2,9 @@ const templateService = require('../services/templateService');
 
 async function list(req, res) {
   try {
-    const items = await templateService.list(req.user.id);
+    const items = await templateService.list(req.user.id, {
+      projectType: req.query.projectType,
+    });
     return res.json(items);
   } catch (err) {
     return res.status(err.status || 500).json({ error: err.message });

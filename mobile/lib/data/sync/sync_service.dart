@@ -1,10 +1,13 @@
 import 'dart:convert';
 
+import '../models/project.dart';
 import '../models/proposal.dart';
 import '../models/template.dart';
 import '../remote/api_client.dart';
+import '../remote/project_api.dart';
 import '../remote/proposal_api.dart';
 import '../remote/template_api.dart';
+import '../repositories/project_repository.dart';
 import '../repositories/proposal_repository.dart';
 import '../repositories/template_repository.dart';
 import 'connectivity_service.dart';
@@ -15,23 +18,29 @@ class SyncService {
     required ApiClient apiClient,
     required ProposalApi proposalApi,
     required TemplateApi templateApi,
+    required ProjectApi projectApi,
     required ProposalRepository proposalRepository,
     required TemplateRepository templateRepository,
+    required ProjectRepository projectRepository,
     required SyncQueueRepository syncQueueRepository,
     required ConnectivityService connectivityService,
   })  : _api = apiClient,
         _proposalApi = proposalApi,
         _templateApi = templateApi,
+        _projectApi = projectApi,
         _proposals = proposalRepository,
         _templates = templateRepository,
+        _projects = projectRepository,
         _queue = syncQueueRepository,
         _connectivity = connectivityService;
 
   final ApiClient _api;
   final ProposalApi _proposalApi;
   final TemplateApi _templateApi;
+  final ProjectApi _projectApi;
   final ProposalRepository _proposals;
   final TemplateRepository _templates;
+  final ProjectRepository _projects;
   final SyncQueueRepository _queue;
   final ConnectivityService _connectivity;
 
@@ -75,6 +84,25 @@ class SyncService {
     );
   }
 
+  Future<void> pushProjectUpsert(Project project) async {
+    await _pushOrEnqueue(
+      entityType: 'project',
+      entityId: project.id,
+      operation: 'upsert',
+      payload: jsonEncode(project.toJson()),
+      send: () => _projectApi.upsert(project),
+    );
+  }
+
+  Future<void> pushProjectDelete(String id) async {
+    await _pushOrEnqueue(
+      entityType: 'project',
+      entityId: id,
+      operation: 'delete',
+      send: () => _projectApi.delete(id),
+    );
+  }
+
   Future<void> flushQueue() async {
     if (!await _canSync()) return;
 
@@ -100,6 +128,7 @@ class SyncService {
     final data = await _api.getJson('/api/sync');
     final proposalJson = (data['proposals'] as List<dynamic>? ?? const []);
     final templateJson = (data['templates'] as List<dynamic>? ?? const []);
+    final projectJson = (data['projects'] as List<dynamic>? ?? const []);
 
     for (final raw in templateJson) {
       final map = Map<String, dynamic>.from(raw as Map);
@@ -128,6 +157,21 @@ class SyncService {
       final local = await _proposals.getById(remote.id);
       if (local == null || !remote.updatedAt.isBefore(local.updatedAt)) {
         await _proposals.insert(remote);
+      }
+    }
+
+    for (final raw in projectJson) {
+      final map = Map<String, dynamic>.from(raw as Map);
+      final deletedAt = map['deletedAt'] as String?;
+      final id = map['id'] as String;
+      if (deletedAt != null) {
+        await _projects.delete(id);
+        continue;
+      }
+      final remote = Project.fromJson(map);
+      final local = await _projects.getById(remote.id);
+      if (local == null || !remote.updatedAt.isBefore(local.updatedAt)) {
+        await _projects.insert(remote);
       }
     }
   }
@@ -171,8 +215,10 @@ class SyncService {
     if (item.operation == 'delete') {
       if (item.entityType == 'proposal') {
         await _proposalApi.delete(item.entityId);
-      } else {
+      } else if (item.entityType == 'template') {
         await _templateApi.delete(item.entityId);
+      } else if (item.entityType == 'project') {
+        await _projectApi.delete(item.entityId);
       }
       return;
     }
@@ -181,8 +227,10 @@ class SyncService {
     final map = jsonDecode(item.payload!) as Map<String, dynamic>;
     if (item.entityType == 'proposal') {
       await _proposalApi.upsert(Proposal.fromJson(map));
-    } else {
+    } else if (item.entityType == 'template') {
       await _templateApi.upsert(ProposalTemplate.fromJson(map));
+    } else if (item.entityType == 'project') {
+      await _projectApi.upsert(Project.fromJson(map));
     }
   }
 

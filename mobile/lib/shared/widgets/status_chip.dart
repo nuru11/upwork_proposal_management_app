@@ -62,3 +62,36 @@ class LanguageChip extends StatelessWidget {
     );
   }
 }
+
+class ProjectTypeChip extends StatelessWidget {
+  const ProjectTypeChip({
+    super.key,
+    required this.projectType,
+    this.compact = false,
+  });
+
+  final ProposalProjectType projectType;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 10,
+        vertical: compact ? 3 : 5,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.blueSoft,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        projectType.label,
+        style: TextStyle(
+          color: AppColors.blue,
+          fontWeight: FontWeight.w700,
+          fontSize: compact ? 11 : 12,
+        ),
+      ),
+    );
+  }
+}

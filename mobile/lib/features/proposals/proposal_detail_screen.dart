@@ -118,11 +118,13 @@ class ProposalDetailScreen extends ConsumerWidget {
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 10),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   StatusChip(status: proposal.status),
-                  const SizedBox(width: 8),
                   LanguageChip(language: proposal.language),
+                  ProjectTypeChip(projectType: proposal.projectType),
                 ],
               ),
               if (proposal.clientName != null &&
