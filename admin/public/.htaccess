@@ -1,0 +1,11 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Serve existing files and directories as-is
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+
+  # Fall back to index.html for client-side routes
+  RewriteRule ^ index.html [L]
+</IfModule>
