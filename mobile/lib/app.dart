@@ -6,9 +6,11 @@ import 'features/auth/login_screen.dart';
 import 'features/profile/profile_screen.dart';
 import 'features/profile/project_form_screen.dart';
 import 'features/profile/projects_list_screen.dart';
+import 'features/proposals/ai_proposal_wizard_screen.dart';
 import 'features/proposals/proposal_detail_screen.dart';
 import 'features/proposals/proposal_form_screen.dart';
 import 'features/proposals/proposals_list_screen.dart';
+import 'data/models/ai_proposal.dart';
 import 'features/stats/stats_screen.dart';
 import 'features/templates/template_form_screen.dart';
 import 'features/templates/templates_list_screen.dart';
@@ -63,6 +65,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                     parentNavigatorKey: _rootNavigatorKey,
                     path: 'new',
                     builder: (context, state) => const ProposalFormScreen(),
+                  ),
+                  GoRoute(
+                    parentNavigatorKey: _rootNavigatorKey,
+                    path: 'ai-wizard',
+                    builder: (context, state) {
+                      final args = state.extra is AiWizardArgs
+                          ? state.extra as AiWizardArgs
+                          : null;
+                      return AiProposalWizardScreen(args: args);
+                    },
                   ),
                   GoRoute(
                     parentNavigatorKey: _rootNavigatorKey,

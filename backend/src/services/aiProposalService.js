@@ -1,0 +1,299 @@
+const { randomUUID } = require('crypto');
+const geminiClient = require('./geminiClient');
+
+const MAX_JOB_DESCRIPTION_LENGTH = 8000;
+const MAX_NOTES_LENGTH = 2000;
+const ALLOWED_DOMAINS = new Set([
+  'ecommerce',
+  'marketplace',
+  'elearning',
+  'booking',
+  'social',
+  'delivery',
+  'fintech',
+  'healthcare',
+  'gaming',
+  'other',
+]);
+
+function httpError(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
+function normalizeJobDescription(raw) {
+  if (raw == null || typeof raw !== 'string' || !raw.trim()) {
+    throw httpError(400, 'jobDescription is required');
+  }
+  const trimmed = raw.trim();
+  if (trimmed.length > MAX_JOB_DESCRIPTION_LENGTH) {
+    throw httpError(
+      400,
+      `jobDescription must be at most ${MAX_JOB_DESCRIPTION_LENGTH} characters`,
+    );
+  }
+  return trimmed;
+}
+
+function normalizeDomain(raw) {
+  const domain = String(raw || 'other').trim().toLowerCase();
+  if (!ALLOWED_DOMAINS.has(domain)) {
+    throw httpError(400, `Invalid domain. Allowed: ${[...ALLOWED_DOMAINS].join(', ')}`);
+  }
+  return domain;
+}
+
+function normalizeLanguage(raw) {
+  const language = String(raw || 'english').trim().toLowerCase();
+  if (language !== 'english' && language !== 'arabic') {
+    throw httpError(400, 'language must be english or arabic');
+  }
+  return language;
+}
+
+function normalizeNotes(raw) {
+  if (raw == null) return '';
+  const trimmed = String(raw).trim();
+  if (!trimmed) return '';
+  if (trimmed.length > MAX_NOTES_LENGTH) {
+    throw httpError(
+      400,
+      `notes must be at most ${MAX_NOTES_LENGTH} characters`,
+    );
+  }
+  return trimmed;
+}
+
+function guidanceBlock(notes) {
+  if (!notes) return '';
+  return `
+Extra guidance from the freelancer (must follow when relevant):
+"""
+${notes}
+"""
+`;
+}
+
+function normalizeIssues(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw httpError(400, 'issues must be a non-empty array');
+  }
+  return raw.map((item, index) => {
+    if (!item || typeof item !== 'object') {
+      throw httpError(400, `issues[${index}] is invalid`);
+    }
+    const title = String(item.title || '').trim();
+    if (!title) {
+      throw httpError(400, `issues[${index}].title is required`);
+    }
+    return {
+      id: String(item.id || randomUUID()),
+      title,
+      whyItFails: String(item.whyItFails || '').trim(),
+    };
+  });
+}
+
+function normalizeSolutions(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw httpError(400, 'solutions must be a non-empty array');
+  }
+  return raw.map((item, index) => {
+    if (!item || typeof item !== 'object') {
+      throw httpError(400, `solutions[${index}] is invalid`);
+    }
+    const offer = String(item.offer || '').trim();
+    if (!offer) {
+      throw httpError(400, `solutions[${index}].offer is required`);
+    }
+    return {
+      issueId: String(item.issueId || ''),
+      issueTitle: String(item.issueTitle || '').trim(),
+      offer,
+    };
+  });
+}
+
+function normalizeProjects(raw) {
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) {
+    throw httpError(400, 'projects must be an array');
+  }
+  return raw.slice(0, 10).map((item) => ({
+    name: String(item?.name || '').trim(),
+    types: Array.isArray(item?.types)
+      ? item.types.map(String)
+      : [],
+    playStoreUrl: item?.playStoreUrl ? String(item.playStoreUrl) : null,
+    appStoreUrl: item?.appStoreUrl ? String(item.appStoreUrl) : null,
+    webUrl: item?.webUrl ? String(item.webUrl) : null,
+  })).filter((p) => p.name);
+}
+
+function assignIssueIds(issues) {
+  return (issues || []).map((issue) => ({
+    id: String(issue.id || randomUUID()),
+    title: String(issue.title || '').trim(),
+    whyItFails: String(issue.whyItFails || '').trim(),
+  })).filter((i) => i.title);
+}
+
+async function extractIssues({ jobDescription, domain, language, notes }) {
+  const job = normalizeJobDescription(jobDescription);
+  const domainNorm = normalizeDomain(domain);
+  const lang = normalizeLanguage(language);
+  const notesNorm = normalizeNotes(notes);
+
+  const prompt = `You help a freelance developer write Upwork proposals.
+Analyze this job posting for a ${domainNorm} project and extract 3 to 5 common failure points or client fears that typically sink this kind of project. Prefer issues that are relevant to THIS posting when possible (e.g. UX complexity, notifications, performance/speed, payments, trust/safety).
+
+Job posting:
+"""
+${job}
+"""
+${guidanceBlock(notesNorm)}
+Respond with JSON only in this exact shape:
+{
+  "issues": [
+    { "title": "short issue name", "whyItFails": "one sentence why this matters for this job" }
+  ]
+}
+
+Language for title and whyItFails: ${lang}.
+Do not invent client names or fake requirements not implied by the job.`;
+
+  const result = await geminiClient.generateJson(prompt);
+  const issues = assignIssueIds(result.issues);
+  if (issues.length === 0) {
+    throw httpError(502, 'AI returned no issues');
+  }
+  return { issues };
+}
+
+async function suggestSolutions({ jobDescription, domain, issues, notes }) {
+  const job = normalizeJobDescription(jobDescription);
+  const domainNorm = normalizeDomain(domain);
+  const issuesNorm = normalizeIssues(issues);
+  const notesNorm = normalizeNotes(notes);
+
+  const prompt = `You help a freelance developer write Upwork proposals.
+For each issue below, write a concrete solution/offer the developer would deliver (specific actions, not vague fluff). Keep each offer to 1–3 sentences.
+
+Domain: ${domainNorm}
+
+Job posting:
+"""
+${job}
+"""
+${guidanceBlock(notesNorm)}
+Issues (JSON):
+${JSON.stringify(issuesNorm, null, 2)}
+
+Respond with JSON only in this exact shape:
+{
+  "solutions": [
+    {
+      "issueId": "same id as input",
+      "issueTitle": "same title as input",
+      "offer": "concrete solution to offer"
+    }
+  ]
+}
+
+Include exactly one solution per input issue, preserving issueId and issueTitle.`;
+
+  const result = await geminiClient.generateJson(prompt);
+  const byId = new Map(
+    (result.solutions || []).map((s) => [String(s.issueId || ''), s]),
+  );
+
+  const solutions = issuesNorm.map((issue) => {
+    const fromAi = byId.get(issue.id);
+    const offer = String(fromAi?.offer || '').trim();
+    if (!offer) {
+      throw httpError(502, `AI missing solution for issue ${issue.id}`);
+    }
+    return {
+      issueId: issue.id,
+      issueTitle: issue.title,
+      offer,
+    };
+  });
+
+  return { solutions };
+}
+
+async function draftProposal({
+  jobDescription,
+  domain,
+  language,
+  issues,
+  solutions,
+  projects,
+  templateBody,
+  clientName,
+  notes,
+}) {
+  const job = normalizeJobDescription(jobDescription);
+  const domainNorm = normalizeDomain(domain);
+  const lang = normalizeLanguage(language);
+  const issuesNorm = normalizeIssues(issues);
+  const solutionsNorm = normalizeSolutions(solutions);
+  const projectsNorm = normalizeProjects(projects);
+  const notesNorm = normalizeNotes(notes);
+  const template = templateBody ? String(templateBody).trim().slice(0, 4000) : '';
+  const client = clientName ? String(clientName).trim().slice(0, 120) : '';
+
+  const prompt = `You write short, high-converting Upwork cover letters for a freelance developer.
+
+Write a problem-first proposal in this structure:
+1. Hook: acknowledge the real risks / issues for this ${domainNorm} job
+2. For each issue: briefly state the issue and your concrete solution
+3. Proof: mention 1–2 projects from the list below by name, and include a store/web URL when provided
+4. Clear CTA (short call to discuss approach / timeline)
+
+Rules:
+- Language: ${lang}
+- Keep it concise (about 150–280 words)
+- Do NOT invent metrics, years of experience, or apps that are not in the projects list
+- If projects list is empty, skip the proof section rather than fabricating
+- If a template style is provided, match its tone and structure without copying it blindly
+${client ? `- You may address the client as ${client}` : '- Do not invent a client name'}
+
+Job posting:
+"""
+${job}
+"""
+${guidanceBlock(notesNorm)}
+Selected issues:
+${JSON.stringify(issuesNorm, null, 2)}
+
+Solutions to offer:
+${JSON.stringify(solutionsNorm, null, 2)}
+
+My relevant projects (only use these):
+${JSON.stringify(projectsNorm, null, 2)}
+
+${template ? `Template style to roughly follow:\n"""\n${template}\n"""` : ''}
+
+Respond with JSON only in this exact shape:
+{
+  "body": "full proposal cover letter text"
+}`;
+
+  const result = await geminiClient.generateJson(prompt);
+  const body = String(result.body || '').trim();
+  if (!body) {
+    throw httpError(502, 'AI returned an empty proposal body');
+  }
+  return { body };
+}
+
+module.exports = {
+  extractIssues,
+  suggestSolutions,
+  draftProposal,
+  ALLOWED_DOMAINS,
+  MAX_JOB_DESCRIPTION_LENGTH,
+};

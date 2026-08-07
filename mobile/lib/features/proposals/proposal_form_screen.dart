@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../data/models/ai_proposal.dart';
 import '../../data/models/proposal.dart';
 import '../../data/models/template.dart';
 import '../../providers/providers.dart';
@@ -32,6 +33,7 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
   ProposalProjectType _projectType = ProposalProjectType.mobileApp;
   String? _templateId;
   String? _templateName;
+  String? _templateBody;
   bool _loaded = false;
   bool _saving = false;
 
@@ -134,6 +136,24 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
       _projectType = selected.projectType;
       _templateId = selected.id;
       _templateName = selected.name;
+      _templateBody = selected.body;
+    });
+  }
+
+  Future<void> _openAiWizard() async {
+    final result = await context.push<AiWizardResult>(
+      '/proposals/ai-wizard',
+      extra: AiWizardArgs(
+        initialLanguage: _language.name,
+        templateBody: _templateBody,
+        clientName: _clientController.text.trim().isEmpty
+            ? null
+            : _clientController.text.trim(),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _bodyController.text = result.body;
     });
   }
 
@@ -208,7 +228,12 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
             ref.watch(templateByIdProvider(_templateId!)).whenData((t) {
               if (t != null && mounted) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) setState(() => _templateName = t.name);
+                  if (mounted) {
+                    setState(() {
+                      _templateName = t.name;
+                      _templateBody ??= t.body;
+                    });
+                  }
                 });
               }
             });
@@ -253,6 +278,12 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
                     ? 'Use template'
                     : 'Template: $_templateName',
               ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _openAiWizard,
+              icon: const Icon(Icons.psychology_outlined),
+              label: const Text('Generate with AI'),
             ),
             const SizedBox(height: 16),
             TextFormField(

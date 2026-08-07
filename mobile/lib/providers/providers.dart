@@ -4,6 +4,7 @@ import '../data/db/app_database.dart';
 import '../data/models/project.dart';
 import '../data/models/proposal.dart';
 import '../data/models/template.dart';
+import '../data/remote/ai_api.dart';
 import '../data/remote/api_client.dart';
 import '../data/remote/project_api.dart';
 import '../data/remote/proposal_api.dart';
@@ -21,6 +22,10 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient();
+});
+
+final aiApiProvider = Provider<AiApi>((ref) {
+  return AiApi(ref.watch(apiClientProvider));
 });
 
 final connectivityServiceProvider = Provider<ConnectivityService>((ref) {

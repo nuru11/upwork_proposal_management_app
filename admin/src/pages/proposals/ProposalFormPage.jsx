@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import {
   createProposal,
@@ -29,11 +29,30 @@ export default function ProposalFormPage() {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
-  const [form, setForm] = useState(blank);
+  const location = useLocation();
+  const skipNextFetch = useRef(
+    Boolean(location.state?.formSnapshot || location.state?.aiBody),
+  );
+  const [form, setForm] = useState(() => {
+    const snap = location.state?.formSnapshot;
+    const aiBody = location.state?.aiBody;
+    if (!snap && !aiBody) return blank;
+    return {
+      ...(snap || blank),
+      ...(aiBody ? { body: aiBody } : {}),
+    };
+  });
   const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(isEdit);
+  const [loading, setLoading] = useState(
+    isEdit && !location.state?.formSnapshot && !location.state?.aiBody,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!location.state?.formSnapshot && !location.state?.aiBody) return;
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +71,11 @@ export default function ProposalFormPage() {
 
   useEffect(() => {
     if (!isEdit) return undefined;
+    if (skipNextFetch.current) {
+      skipNextFetch.current = false;
+      setLoading(false);
+      return undefined;
+    }
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -98,6 +122,19 @@ export default function ProposalFormPage() {
       language: tpl.language || f.language,
       projectType: tpl.projectType || f.projectType,
     }));
+  }
+
+  function openAiWizard() {
+    const selectedTemplate = templates.find((t) => t.id === form.templateId);
+    navigate('/proposals/ai-wizard', {
+      state: {
+        returnTo: isEdit ? `/proposals/${id}/edit` : '/proposals/new',
+        formSnapshot: form,
+        language: form.language,
+        clientName: form.clientName,
+        templateBody: selectedTemplate?.body || '',
+      },
+    });
   }
 
   async function handleSubmit(e) {
@@ -157,6 +194,16 @@ export default function ProposalFormPage() {
       {error ? <div className="alert alert-error">{error}</div> : null}
 
       <form className="form" onSubmit={handleSubmit}>
+        <div className="form-actions" style={{ marginBottom: 8 }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={openAiWizard}
+          >
+            Generate with AI
+          </button>
+        </div>
+
         <label className="field">
           <span>Title *</span>
           <input

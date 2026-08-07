@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage';
 import ProposalsListPage from './pages/proposals/ProposalsListPage';
 import ProposalFormPage from './pages/proposals/ProposalFormPage';
 import ProposalDetailPage from './pages/proposals/ProposalDetailPage';
+import AiProposalWizardPage from './pages/proposals/AiProposalWizardPage';
 import TemplatesListPage from './pages/templates/TemplatesListPage';
 import TemplateFormPage from './pages/templates/TemplateFormPage';
 import ProjectsListPage from './pages/projects/ProjectsListPage';
@@ -34,6 +35,7 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="proposals" element={<ProposalsListPage />} />
         <Route path="proposals/new" element={<ProposalFormPage />} />
+        <Route path="proposals/ai-wizard" element={<AiProposalWizardPage />} />
         <Route path="proposals/:id" element={<ProposalDetailPage />} />
         <Route path="proposals/:id/edit" element={<ProposalFormPage />} />
         <Route path="templates" element={<TemplatesListPage />} />

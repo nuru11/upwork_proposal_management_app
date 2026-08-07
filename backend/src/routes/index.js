@@ -3,6 +3,7 @@ const authRoutes = require('./authRoutes');
 const proposalRoutes = require('./proposalRoutes');
 const templateRoutes = require('./templateRoutes');
 const projectRoutes = require('./projectRoutes');
+const aiRoutes = require('./aiRoutes');
 const syncController = require('../controllers/syncController');
 const { authRequired } = require('../middleware/auth');
 
@@ -16,6 +17,7 @@ router.use('/auth', authRoutes);
 router.use('/proposals', proposalRoutes);
 router.use('/templates', templateRoutes);
 router.use('/projects', projectRoutes);
+router.use('/ai', aiRoutes);
 router.get('/sync', authRequired, syncController.sync);
 
 module.exports = router;

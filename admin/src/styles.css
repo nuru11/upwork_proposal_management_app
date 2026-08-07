@@ -675,3 +675,96 @@ fieldset.field {
     grid-template-columns: 1fr;
   }
 }
+
+.panel {
+  background: white;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.ai-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.ai-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--slate-100);
+  color: var(--slate-500);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ai-step.active {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.ai-step.current {
+  outline: 2px solid var(--teal);
+}
+
+.ai-step-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: white;
+  font-size: 12px;
+}
+
+.ai-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-card {
+  background: white;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.ai-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ai-add-issue {
+  border-style: dashed;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.checkbox-field input {
+  width: auto;
+}
+
+.ai-actions {
+  justify-content: space-between;
+  margin-top: 16px;
+}
