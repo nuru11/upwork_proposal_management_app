@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../data/models/ai_draft.dart';
 import '../../data/models/ai_proposal.dart';
 import '../../data/models/proposal.dart';
 import '../../data/models/template.dart';
@@ -10,9 +11,10 @@ import '../../providers/providers.dart';
 import '../../shared/theme/app_theme.dart';
 
 class ProposalFormScreen extends ConsumerStatefulWidget {
-  const ProposalFormScreen({super.key, this.proposalId});
+  const ProposalFormScreen({super.key, this.proposalId, this.prefill});
 
   final String? proposalId;
+  final ProposalPrefill? prefill;
 
   bool get isEditing => proposalId != null;
 
@@ -36,6 +38,22 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
   String? _templateBody;
   bool _loaded = false;
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final prefill = widget.prefill;
+    if (prefill != null && !widget.isEditing) {
+      if (prefill.title != null) _titleController.text = prefill.title!;
+      if (prefill.body != null) _bodyController.text = prefill.body!;
+      if (prefill.clientName != null) {
+        _clientController.text = prefill.clientName!;
+      }
+      if (prefill.language != null) {
+        _language = ProposalLanguage.fromStorage(prefill.language!);
+      }
+    }
+  }
 
   @override
   void dispose() {

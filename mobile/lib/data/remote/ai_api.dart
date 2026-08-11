@@ -1,5 +1,4 @@
 import '../models/ai_proposal.dart';
-import '../models/project.dart';
 import 'api_client.dart';
 
 class AiApi {
@@ -53,7 +52,7 @@ class AiApi {
     required String language,
     required List<AiIssue> issues,
     required List<AiSolution> solutions,
-    required List<Project> projects,
+    required List<AiProjectMention> projects,
     String? templateBody,
     String? clientName,
     String? notes,
@@ -66,12 +65,19 @@ class AiApi {
       'solutions': solutions.map((e) => e.toJson()).toList(),
       'projects': projects
           .map(
-            (p) => {
-              'name': p.name,
-              'types': p.types.map((t) => t.name).toList(),
-              'playStoreUrl': p.playStoreUrl,
-              'appStoreUrl': p.appStoreUrl,
-              'webUrl': p.webUrl,
+            (mention) {
+              final p = mention.project;
+              final note = mention.mentionNote?.trim();
+              return {
+                'name': p.name,
+                'description': p.description,
+                'types': p.types.map((t) => t.name).toList(),
+                'playStoreUrl': p.playStoreUrl,
+                'appStoreUrl': p.appStoreUrl,
+                'webUrl': p.webUrl,
+                'describe': mention.describe,
+                'mentionNote': (note != null && note.isNotEmpty) ? note : null,
+              };
             },
           )
           .toList(),

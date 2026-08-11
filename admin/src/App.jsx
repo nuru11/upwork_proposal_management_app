@@ -7,6 +7,8 @@ import ProposalsListPage from './pages/proposals/ProposalsListPage';
 import ProposalFormPage from './pages/proposals/ProposalFormPage';
 import ProposalDetailPage from './pages/proposals/ProposalDetailPage';
 import AiProposalWizardPage from './pages/proposals/AiProposalWizardPage';
+import AiDraftsListPage from './pages/aiDrafts/AiDraftsListPage';
+import AiDraftDetailPage from './pages/aiDrafts/AiDraftDetailPage';
 import TemplatesListPage from './pages/templates/TemplatesListPage';
 import TemplateFormPage from './pages/templates/TemplateFormPage';
 import ProjectsListPage from './pages/projects/ProjectsListPage';
@@ -38,6 +40,8 @@ export default function App() {
         <Route path="proposals/ai-wizard" element={<AiProposalWizardPage />} />
         <Route path="proposals/:id" element={<ProposalDetailPage />} />
         <Route path="proposals/:id/edit" element={<ProposalFormPage />} />
+        <Route path="ai-drafts" element={<AiDraftsListPage />} />
+        <Route path="ai-drafts/:id" element={<AiDraftDetailPage />} />
         <Route path="templates" element={<TemplatesListPage />} />
         <Route path="templates/new" element={<TemplateFormPage />} />
         <Route path="templates/:id/edit" element={<TemplateFormPage />} />

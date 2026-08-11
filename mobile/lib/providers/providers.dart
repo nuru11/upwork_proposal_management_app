@@ -1,14 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/db/app_database.dart';
+import '../data/models/ai_draft.dart';
 import '../data/models/project.dart';
 import '../data/models/proposal.dart';
 import '../data/models/template.dart';
 import '../data/remote/ai_api.dart';
+import '../data/remote/ai_draft_api.dart';
 import '../data/remote/api_client.dart';
 import '../data/remote/project_api.dart';
 import '../data/remote/proposal_api.dart';
 import '../data/remote/template_api.dart';
+import '../data/repositories/ai_draft_repository.dart';
 import '../data/repositories/project_repository.dart';
 import '../data/repositories/proposal_repository.dart';
 import '../data/repositories/template_repository.dart';
@@ -44,6 +47,10 @@ final projectRepositoryProvider = Provider<ProjectRepository>((ref) {
   return ProjectRepository(ref.watch(appDatabaseProvider));
 });
 
+final aiDraftRepositoryProvider = Provider<AiDraftRepository>((ref) {
+  return AiDraftRepository(ref.watch(appDatabaseProvider));
+});
+
 final syncQueueRepositoryProvider = Provider<SyncQueueRepository>((ref) {
   return SyncQueueRepository(ref.watch(appDatabaseProvider));
 });
@@ -55,9 +62,11 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     proposalApi: ProposalApi(api),
     templateApi: TemplateApi(api),
     projectApi: ProjectApi(api),
+    aiDraftApi: AiDraftApi(api),
     proposalRepository: ref.watch(proposalRepositoryProvider),
     templateRepository: ref.watch(templateRepositoryProvider),
     projectRepository: ref.watch(projectRepositoryProvider),
+    aiDraftRepository: ref.watch(aiDraftRepositoryProvider),
     syncQueueRepository: ref.watch(syncQueueRepositoryProvider),
     connectivityService: ref.watch(connectivityServiceProvider),
   );
@@ -126,6 +135,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
         ref.read(proposalsProvider.notifier).refresh();
         ref.read(templatesProvider.notifier).refresh();
         ref.read(projectsProvider.notifier).refresh();
+        ref.read(aiDraftsProvider.notifier).refresh();
       });
       return true;
     } catch (e) {
@@ -152,6 +162,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     await ref.read(proposalsProvider.notifier).refresh();
     await ref.read(templatesProvider.notifier).refresh();
     await ref.read(projectsProvider.notifier).refresh();
+    await ref.read(aiDraftsProvider.notifier).refresh();
   }
 }
 
@@ -481,6 +492,47 @@ final projectByIdProvider =
     FutureProvider.family<Project?, String>((ref, id) async {
   ref.watch(projectsProvider);
   return ref.read(projectRepositoryProvider).getById(id);
+});
+
+class AiDraftsNotifier extends AsyncNotifier<List<AiDraft>> {
+  @override
+  Future<List<AiDraft>> build() {
+    return ref.read(aiDraftRepositoryProvider).getAll();
+  }
+
+  Future<void> refresh() async {
+    state = await AsyncValue.guard(
+      () => ref.read(aiDraftRepositoryProvider).getAll(),
+    );
+  }
+
+  Future<void> save(AiDraft draft, {required bool isNew}) async {
+    final repo = ref.read(aiDraftRepositoryProvider);
+    if (isNew) {
+      await repo.insert(draft);
+    } else {
+      await repo.update(draft);
+    }
+    await ref.read(syncServiceProvider).pushAiDraftUpsert(draft);
+    await refresh();
+  }
+
+  Future<void> delete(String id) async {
+    await ref.read(aiDraftRepositoryProvider).delete(id);
+    await ref.read(syncServiceProvider).pushAiDraftDelete(id);
+    await refresh();
+  }
+}
+
+final aiDraftsProvider =
+    AsyncNotifierProvider<AiDraftsNotifier, List<AiDraft>>(
+  AiDraftsNotifier.new,
+);
+
+final aiDraftByIdProvider =
+    FutureProvider.family<AiDraft?, String>((ref, id) async {
+  ref.watch(aiDraftsProvider);
+  return ref.read(aiDraftRepositoryProvider).getById(id);
 });
 
 class StatsSnapshot {

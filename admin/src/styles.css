@@ -768,3 +768,72 @@ fieldset.field {
   justify-content: space-between;
   margin-top: 16px;
 }
+
+.ai-project-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ai-project-picker-header > span:first-child {
+  font-weight: 600;
+  color: var(--slate-700);
+  font-size: 13px;
+}
+
+.ai-project-picker-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.ai-project-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius);
+  background: var(--slate-100);
+}
+
+.ai-project-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  padding: 8px 10px;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius);
+  background: #fff;
+  font-weight: 500;
+}
+
+.ai-project-item-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 24px;
+}
+
+.ai-project-item-options input[type='text'] {
+  width: 100%;
+}
+
+.ai-project-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-project-item-text strong {
+  font-weight: 600;
+}
+
+.ai-project-item-text span {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--slate-500);
+}

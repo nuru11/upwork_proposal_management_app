@@ -21,6 +21,7 @@ class ProjectFormScreen extends ConsumerStatefulWidget {
 class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _playStoreController = TextEditingController();
   final _appStoreController = TextEditingController();
   final _webController = TextEditingController();
@@ -33,6 +34,7 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _descriptionController.dispose();
     _playStoreController.dispose();
     _appStoreController.dispose();
     _webController.dispose();
@@ -42,6 +44,7 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
   void _hydrate(Project project) {
     if (_loaded) return;
     _nameController.text = project.name;
+    _descriptionController.text = project.description ?? '';
     _playStoreController.text = project.playStoreUrl ?? '';
     _appStoreController.text = project.appStoreUrl ?? '';
     _webController.text = project.webUrl ?? '';
@@ -92,9 +95,11 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
     setState(() => _saving = true);
 
     final now = DateTime.now();
+    final description = _descriptionController.text.trim();
     final project = Project(
       id: existing?.id ?? const Uuid().v4(),
       name: _nameController.text.trim(),
+      description: description.isEmpty ? null : description,
       playStoreUrl: _optionalUrl(_playStoreController.text),
       appStoreUrl: _optionalUrl(_appStoreController.text),
       webUrl: _optionalUrl(_webController.text),
@@ -180,6 +185,17 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
                 }
                 return null;
               },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _descriptionController,
+              textCapitalization: TextCapitalization.sentences,
+              minLines: 3,
+              maxLines: 6,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                hintText: 'Optional notes about this project',
+              ),
             ),
             const SizedBox(height: 20),
             Text(

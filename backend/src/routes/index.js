@@ -4,6 +4,7 @@ const proposalRoutes = require('./proposalRoutes');
 const templateRoutes = require('./templateRoutes');
 const projectRoutes = require('./projectRoutes');
 const aiRoutes = require('./aiRoutes');
+const aiDraftRoutes = require('./aiDraftRoutes');
 const syncController = require('../controllers/syncController');
 const { authRequired } = require('../middleware/auth');
 
@@ -18,6 +19,7 @@ router.use('/proposals', proposalRoutes);
 router.use('/templates', templateRoutes);
 router.use('/projects', projectRoutes);
 router.use('/ai', aiRoutes);
+router.use('/ai-drafts', aiDraftRoutes);
 router.get('/sync', authRequired, syncController.sync);
 
 module.exports = router;

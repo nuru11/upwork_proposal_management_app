@@ -1,12 +1,15 @@
 import 'dart:convert';
 
+import '../models/ai_draft.dart';
 import '../models/project.dart';
 import '../models/proposal.dart';
 import '../models/template.dart';
+import '../remote/ai_draft_api.dart';
 import '../remote/api_client.dart';
 import '../remote/project_api.dart';
 import '../remote/proposal_api.dart';
 import '../remote/template_api.dart';
+import '../repositories/ai_draft_repository.dart';
 import '../repositories/project_repository.dart';
 import '../repositories/proposal_repository.dart';
 import '../repositories/template_repository.dart';
@@ -19,18 +22,22 @@ class SyncService {
     required ProposalApi proposalApi,
     required TemplateApi templateApi,
     required ProjectApi projectApi,
+    required AiDraftApi aiDraftApi,
     required ProposalRepository proposalRepository,
     required TemplateRepository templateRepository,
     required ProjectRepository projectRepository,
+    required AiDraftRepository aiDraftRepository,
     required SyncQueueRepository syncQueueRepository,
     required ConnectivityService connectivityService,
   })  : _api = apiClient,
         _proposalApi = proposalApi,
         _templateApi = templateApi,
         _projectApi = projectApi,
+        _aiDraftApi = aiDraftApi,
         _proposals = proposalRepository,
         _templates = templateRepository,
         _projects = projectRepository,
+        _aiDrafts = aiDraftRepository,
         _queue = syncQueueRepository,
         _connectivity = connectivityService;
 
@@ -38,9 +45,11 @@ class SyncService {
   final ProposalApi _proposalApi;
   final TemplateApi _templateApi;
   final ProjectApi _projectApi;
+  final AiDraftApi _aiDraftApi;
   final ProposalRepository _proposals;
   final TemplateRepository _templates;
   final ProjectRepository _projects;
+  final AiDraftRepository _aiDrafts;
   final SyncQueueRepository _queue;
   final ConnectivityService _connectivity;
 
@@ -103,6 +112,25 @@ class SyncService {
     );
   }
 
+  Future<void> pushAiDraftUpsert(AiDraft draft) async {
+    await _pushOrEnqueue(
+      entityType: 'ai_draft',
+      entityId: draft.id,
+      operation: 'upsert',
+      payload: jsonEncode(draft.toJson()),
+      send: () => _aiDraftApi.upsert(draft),
+    );
+  }
+
+  Future<void> pushAiDraftDelete(String id) async {
+    await _pushOrEnqueue(
+      entityType: 'ai_draft',
+      entityId: id,
+      operation: 'delete',
+      send: () => _aiDraftApi.delete(id),
+    );
+  }
+
   Future<void> flushQueue() async {
     if (!await _canSync()) return;
 
@@ -129,6 +157,7 @@ class SyncService {
     final proposalJson = (data['proposals'] as List<dynamic>? ?? const []);
     final templateJson = (data['templates'] as List<dynamic>? ?? const []);
     final projectJson = (data['projects'] as List<dynamic>? ?? const []);
+    final aiDraftJson = (data['aiDrafts'] as List<dynamic>? ?? const []);
 
     for (final raw in templateJson) {
       final map = Map<String, dynamic>.from(raw as Map);
@@ -172,6 +201,21 @@ class SyncService {
       final local = await _projects.getById(remote.id);
       if (local == null || !remote.updatedAt.isBefore(local.updatedAt)) {
         await _projects.insert(remote);
+      }
+    }
+
+    for (final raw in aiDraftJson) {
+      final map = Map<String, dynamic>.from(raw as Map);
+      final deletedAt = map['deletedAt'] as String?;
+      final id = map['id'] as String;
+      if (deletedAt != null) {
+        await _aiDrafts.delete(id);
+        continue;
+      }
+      final remote = AiDraft.fromJson(map);
+      final local = await _aiDrafts.getById(remote.id);
+      if (local == null || !remote.updatedAt.isBefore(local.updatedAt)) {
+        await _aiDrafts.insert(remote);
       }
     }
   }
@@ -219,6 +263,8 @@ class SyncService {
         await _templateApi.delete(item.entityId);
       } else if (item.entityType == 'project') {
         await _projectApi.delete(item.entityId);
+      } else if (item.entityType == 'ai_draft') {
+        await _aiDraftApi.delete(item.entityId);
       }
       return;
     }
@@ -231,6 +277,8 @@ class SyncService {
       await _templateApi.upsert(ProposalTemplate.fromJson(map));
     } else if (item.entityType == 'project') {
       await _projectApi.upsert(Project.fromJson(map));
+    } else if (item.entityType == 'ai_draft') {
+      await _aiDraftApi.upsert(AiDraft.fromJson(map));
     }
   }
 

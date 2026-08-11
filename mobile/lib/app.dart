@@ -6,10 +6,13 @@ import 'features/auth/login_screen.dart';
 import 'features/profile/profile_screen.dart';
 import 'features/profile/project_form_screen.dart';
 import 'features/profile/projects_list_screen.dart';
+import 'features/proposals/ai_draft_detail_screen.dart';
+import 'features/proposals/ai_drafts_list_screen.dart';
 import 'features/proposals/ai_proposal_wizard_screen.dart';
 import 'features/proposals/proposal_detail_screen.dart';
 import 'features/proposals/proposal_form_screen.dart';
 import 'features/proposals/proposals_list_screen.dart';
+import 'data/models/ai_draft.dart';
 import 'data/models/ai_proposal.dart';
 import 'features/stats/stats_screen.dart';
 import 'features/templates/template_form_screen.dart';
@@ -50,6 +53,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/login',
         builder: (context, state) => const LoginScreen(),
       ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/ai-drafts',
+        builder: (context, state) => const AiDraftsListScreen(),
+        routes: [
+          GoRoute(
+            parentNavigatorKey: _rootNavigatorKey,
+            path: ':id',
+            builder: (context, state) => AiDraftDetailScreen(
+              draftId: state.pathParameters['id']!,
+            ),
+          ),
+        ],
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return AppShell(navigationShell: navigationShell);
@@ -64,7 +81,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     parentNavigatorKey: _rootNavigatorKey,
                     path: 'new',
-                    builder: (context, state) => const ProposalFormScreen(),
+                    builder: (context, state) {
+                      final prefill = state.extra is ProposalPrefill
+                          ? state.extra as ProposalPrefill
+                          : null;
+                      return ProposalFormScreen(prefill: prefill);
+                    },
                   ),
                   GoRoute(
                     parentNavigatorKey: _rootNavigatorKey,

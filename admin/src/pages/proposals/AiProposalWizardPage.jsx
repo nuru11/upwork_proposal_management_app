@@ -1,10 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { draftProposal, extractIssues, suggestSolutions } from '../../api/ai';
+import { createAiDraft, titleFromJob } from '../../api/aiDrafts';
 import { listProjects } from '../../api/projects';
-import { LANGUAGES, PORTFOLIO_TYPES } from '../../constants/enums';
+import { LANGUAGES, AI_DOMAINS } from '../../constants/enums';
 
 const STEPS = ['Job', 'Issues', 'Solutions', 'Draft'];
+
+function matchingProjectIds(projects, domain) {
+  return (projects || [])
+    .filter((p) => Array.isArray(p.types) && p.types.includes(domain))
+    .map((p) => p.id);
+}
+
+function previewDescription(text) {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return 'No description';
+  return trimmed.length > 100 ? `${trimmed.slice(0, 100)}…` : trimmed;
+}
 
 export default function AiProposalWizardPage() {
   const navigate = useNavigate();
@@ -32,6 +45,69 @@ export default function AiProposalWizardPage() {
   const [draftBody, setDraftBody] = useState('');
   const [newIssueTitle, setNewIssueTitle] = useState('');
   const [newIssueWhy, setNewIssueWhy] = useState('');
+
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState(() => new Set());
+  const [describeProjectIds, setDescribeProjectIds] = useState(() => new Set());
+  const [projectNotes, setProjectNotes] = useState({});
+  const [projectsLoading, setProjectsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await listProjects();
+        if (cancelled) return;
+        const items = list || [];
+        setProjects(items);
+        setSelectedProjectIds(new Set(matchingProjectIds(items, domain)));
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Failed to load projects');
+      } finally {
+        if (!cancelled) setProjectsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Pre-check against the initial domain only; later domain changes re-apply below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function changeDomain(nextDomain) {
+    setDomain(nextDomain);
+    setSelectedProjectIds(new Set(matchingProjectIds(projects, nextDomain)));
+  }
+
+  function toggleProject(id) {
+    setSelectedProjectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleDescribe(id) {
+    setDescribeProjectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function setProjectNote(id, value) {
+    setProjectNotes((prev) => ({ ...prev, [id]: value }));
+  }
+
+  function selectAllProjects() {
+    setSelectedProjectIds(new Set(projects.map((p) => p.id)));
+  }
+
+  function clearProjectSelection() {
+    setSelectedProjectIds(new Set());
+  }
 
   const selectedIssues = useMemo(
     () => issues.filter((i) => i.selected && i.title.trim()),
@@ -136,10 +212,7 @@ export default function AiProposalWizardPage() {
     setBusy(true);
     setError('');
     try {
-      const projects = await listProjects();
-      const matching = (projects || []).filter((p) =>
-        Array.isArray(p.types) ? p.types.includes(domain) : false,
-      );
+      const selectedProjects = projects.filter((p) => selectedProjectIds.has(p.id));
 
       const result = await draftProposal({
         jobDescription: jobDescription.trim(),
@@ -155,12 +228,15 @@ export default function AiProposalWizardPage() {
           issueTitle: s.issueTitle,
           offer: s.offer.trim(),
         })),
-        projects: matching.map((p) => ({
+        projects: selectedProjects.map((p) => ({
           name: p.name,
+          description: p.description || null,
           types: p.types,
           playStoreUrl: p.playStoreUrl,
           appStoreUrl: p.appStoreUrl,
           webUrl: p.webUrl,
+          describe: describeProjectIds.has(p.id),
+          mentionNote: (projectNotes[p.id] || '').trim() || null,
         })),
         templateBody:
           useTemplate && templateBody.trim() ? templateBody.trim() : undefined,
@@ -195,6 +271,47 @@ export default function AiProposalWizardPage() {
         aiBody: body,
       },
     });
+  }
+
+  async function saveAiDraft() {
+    const body = draftBody.trim();
+    if (!body) {
+      setError('Draft is empty.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const created = await createAiDraft({
+        id: crypto.randomUUID(),
+        title: titleFromJob(jobDescription),
+        jobDescription: jobDescription.trim(),
+        notes: guidanceNotes || null,
+        domain,
+        language,
+        issues: selectedIssues.map(({ id, title, whyItFails }) => ({
+          id,
+          title: title.trim(),
+          whyItFails: whyItFails || '',
+        })),
+        solutions: solutions
+          .filter((s) => (s.offer || '').trim())
+          .map((s) => ({
+            issueId: s.issueId,
+            issueTitle: s.issueTitle,
+            offer: s.offer.trim(),
+          })),
+        body,
+        clientName: clientName.trim() || null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      navigate(`/ai-drafts/${created.id}`, { replace: true });
+    } catch (err) {
+      setError(err.message || 'Failed to save AI draft');
+    } finally {
+      setBusy(false);
+    }
   }
 
   function primaryAction() {
@@ -269,16 +386,96 @@ export default function AiProposalWizardPage() {
             <span>Domain</span>
             <select
               value={domain}
-              onChange={(e) => setDomain(e.target.value)}
+              onChange={(e) => changeDomain(e.target.value)}
               disabled={busy}
             >
-              {PORTFOLIO_TYPES.map((t) => (
+              {AI_DOMAINS.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
                 </option>
               ))}
             </select>
           </label>
+
+          <div className="field">
+            <div className="ai-project-picker-header">
+              <span>Projects to mention</span>
+              {projects.length ? (
+                <span className="ai-project-picker-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={selectAllProjects}
+                    disabled={busy || projectsLoading}
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={clearProjectSelection}
+                    disabled={busy || projectsLoading}
+                  >
+                    Clear
+                  </button>
+                </span>
+              ) : null}
+            </div>
+            {projectsLoading ? (
+              <p className="muted">Loading projects…</p>
+            ) : projects.length === 0 ? (
+              <p className="muted">
+                No projects yet.{' '}
+                <Link to="/projects">Add projects</Link> so the AI can mention them.
+              </p>
+            ) : (
+              <div className="ai-project-picker">
+                {projects.map((project) => {
+                  const selected = selectedProjectIds.has(project.id);
+                  return (
+                    <div key={project.id} className="ai-project-item">
+                      <label className="checkbox-field">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleProject(project.id)}
+                          disabled={busy}
+                        />
+                        <span className="ai-project-item-text">
+                          <strong>{project.name}</strong>
+                          <span>{previewDescription(project.description)}</span>
+                        </span>
+                      </label>
+                      {selected ? (
+                        <div className="ai-project-item-options">
+                          <label className="checkbox-field">
+                            <input
+                              type="checkbox"
+                              checked={describeProjectIds.has(project.id)}
+                              onChange={() => toggleDescribe(project.id)}
+                              disabled={busy}
+                            />
+                            <span>Describe it</span>
+                          </label>
+                          <label className="field">
+                            <span>Specific note</span>
+                            <input
+                              type="text"
+                              value={projectNotes[project.id] || ''}
+                              onChange={(e) => setProjectNote(project.id, e.target.value)}
+                              placeholder="e.g. how you improved this app's security"
+                              maxLength={500}
+                              disabled={busy}
+                            />
+                          </label>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <label className="field">
             <span>Language</span>
@@ -467,14 +664,26 @@ export default function AiProposalWizardPage() {
         ) : (
           <span />
         )}
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={busy}
-          onClick={primaryAction}
-        >
-          {busy ? 'Working…' : primaryLabel}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {step === 3 ? (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={busy}
+              onClick={saveAiDraft}
+            >
+              Save AI draft
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy}
+            onClick={primaryAction}
+          >
+            {busy ? 'Working…' : primaryLabel}
+          </button>
+        </div>
       </div>
     </div>
   );

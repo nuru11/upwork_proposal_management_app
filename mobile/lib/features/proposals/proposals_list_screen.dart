@@ -36,6 +36,11 @@ class _ProposalsListScreenState extends ConsumerState<ProposalsListScreen> {
         title: const Text('Proposals'),
         actions: [
           IconButton(
+            tooltip: 'AI drafts',
+            onPressed: () => context.push('/ai-drafts'),
+            icon: const Icon(Icons.psychology_outlined),
+          ),
+          IconButton(
             tooltip: 'Sync now',
             onPressed: () async {
               await ref.read(authProvider.notifier).syncIfAuthenticated();

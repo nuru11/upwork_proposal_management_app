@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../data/models/ai_draft.dart';
 import '../../data/models/ai_proposal.dart';
 import '../../data/models/project.dart';
 import '../../data/models/proposal.dart';
@@ -30,7 +31,7 @@ class _AiProposalWizardScreenState
   bool _loading = false;
   String? _error;
 
-  ProjectType _domain = ProjectType.marketplace;
+  AiDomain _domain = AiDomain.marketplace;
   ProposalLanguage _language = ProposalLanguage.english;
   bool _useTemplate = false;
 
@@ -39,6 +40,12 @@ class _AiProposalWizardScreenState
   final Map<String, TextEditingController> _issueWhyControllers = {};
   List<AiSolution> _solutions = [];
   final Map<String, TextEditingController> _solutionControllers = {};
+
+  List<Project> _projects = [];
+  final Set<String> _selectedProjectIds = {};
+  final Set<String> _describeProjectIds = {};
+  final Map<String, TextEditingController> _projectNoteControllers = {};
+  bool _projectsLoading = true;
 
   @override
   void initState() {
@@ -50,6 +57,79 @@ class _AiProposalWizardScreenState
     if (args?.templateBody != null && args!.templateBody!.trim().isNotEmpty) {
       _useTemplate = true;
     }
+    _loadProjects();
+  }
+
+  Future<void> _loadProjects() async {
+    try {
+      final list = await ref.read(projectRepositoryProvider).getAll();
+      if (!mounted) return;
+      setState(() {
+        _projects = list;
+        _selectedProjectIds
+          ..clear()
+          ..addAll(_matchingProjectIds(list, _domain));
+        _projectsLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _projectsLoading = false;
+        _error = _friendlyError(e);
+      });
+    }
+  }
+
+  Set<String> _matchingProjectIds(List<Project> projects, AiDomain domain) {
+    final type = domain.matchingProjectType;
+    if (type == null) return {};
+    return projects
+        .where((p) => p.types.contains(type))
+        .map((p) => p.id)
+        .toSet();
+  }
+
+  void _setDomain(AiDomain domain) {
+    setState(() {
+      _domain = domain;
+      _selectedProjectIds
+        ..clear()
+        ..addAll(_matchingProjectIds(_projects, domain));
+    });
+  }
+
+  void _toggleProject(String id, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedProjectIds.add(id);
+      } else {
+        _selectedProjectIds.remove(id);
+      }
+    });
+  }
+
+  void _toggleDescribe(String id, bool describe) {
+    setState(() {
+      if (describe) {
+        _describeProjectIds.add(id);
+      } else {
+        _describeProjectIds.remove(id);
+      }
+    });
+  }
+
+  TextEditingController _noteControllerFor(String id) {
+    return _projectNoteControllers.putIfAbsent(
+      id,
+      TextEditingController.new,
+    );
+  }
+
+  String _projectPreview(Project project) {
+    final text = project.description?.trim() ?? '';
+    if (text.isEmpty) return 'No description';
+    if (text.length <= 80) return text;
+    return '${text.substring(0, 80)}…';
   }
 
   @override
@@ -64,6 +144,9 @@ class _AiProposalWizardScreenState
       c.dispose();
     }
     for (final c in _solutionControllers.values) {
+      c.dispose();
+    }
+    for (final c in _projectNoteControllers.values) {
       c.dispose();
     }
     super.dispose();
@@ -246,9 +329,16 @@ class _AiProposalWizardScreenState
     });
 
     try {
-      final allProjects =
-          await ref.read(projectRepositoryProvider).getAll(type: _domain);
-      final matching = allProjects;
+      final selectedProjects = _projects
+          .where((p) => _selectedProjectIds.contains(p.id))
+          .map(
+            (p) => AiProjectMention(
+              project: p,
+              describe: _describeProjectIds.contains(p.id),
+              mentionNote: _projectNoteControllers[p.id]?.text.trim(),
+            ),
+          )
+          .toList();
 
       final body = await ref.read(aiApiProvider).draftProposal(
             jobDescription: _jobController.text.trim(),
@@ -256,7 +346,7 @@ class _AiProposalWizardScreenState
             language: _language.name,
             issues: selected,
             solutions: solutions,
-            projects: matching,
+            projects: selectedProjects,
             templateBody: _templateBody,
             clientName: widget.args?.clientName,
             notes: _guidanceNotes,
@@ -295,6 +385,47 @@ class _AiProposalWizardScreenState
       return;
     }
     context.pop(AiWizardResult(body: body));
+  }
+
+  Future<void> _saveAiDraft() async {
+    final body = _draftController.text.trim();
+    if (body.isEmpty) {
+      setState(() => _error = 'Draft is empty.');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final now = DateTime.now();
+      final job = _jobController.text.trim();
+      final draft = AiDraft(
+        id: const Uuid().v4(),
+        title: AiDraft.titleFromJob(job),
+        jobDescription: job,
+        notes: _guidanceNotes,
+        domain: _domain.name,
+        language: _language.name,
+        issues: _selectedIssuesWithEdits(),
+        solutions: _solutionsWithEdits(),
+        body: body,
+        clientName: widget.args?.clientName,
+        createdAt: now,
+        updatedAt: now,
+      );
+      await ref.read(aiDraftsProvider.notifier).save(draft, isNew: true);
+      if (!mounted) return;
+      context.go('/ai-drafts/${draft.id}');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = _friendlyError(e);
+      });
+    }
   }
 
   String get _stepTitle => switch (_step) {
@@ -373,6 +504,13 @@ class _AiProposalWizardScreenState
                       child: const Text('Back'),
                     ),
                   const Spacer(),
+                  if (_step == 3) ...[
+                    OutlinedButton(
+                      onPressed: _loading ? null : _saveAiDraft,
+                      child: const Text('Save AI draft'),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   FilledButton(
                     onPressed: _loading ? null : _primaryAction,
                     child: _loading
@@ -441,15 +579,126 @@ class _AiProposalWizardScreenState
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: ProjectType.values.map((type) {
+          children: AiDomain.values.map((type) {
             final selected = _domain == type;
             return ChoiceChip(
               label: Text(type.label),
               selected: selected,
-              onSelected: (_) => setState(() => _domain = type),
+              onSelected: (_) => _setDomain(type),
             );
           }).toList(),
         ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Projects to mention',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            if (_projects.isNotEmpty) ...[
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _selectedProjectIds
+                      ..clear()
+                      ..addAll(_projects.map((p) => p.id));
+                  });
+                },
+                child: const Text('Select all'),
+              ),
+              TextButton(
+                onPressed: () => setState(_selectedProjectIds.clear),
+                child: const Text('Clear'),
+              ),
+            ],
+          ],
+        ),
+        if (_projectsLoading)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text('Loading projects…'),
+          )
+        else if (_projects.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text.rich(
+              TextSpan(
+                text: 'No projects yet. ',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.slate500,
+                    ),
+                children: [
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.baseline,
+                    baseline: TextBaseline.alphabetic,
+                    child: GestureDetector(
+                      onTap: () => context.push('/profile/projects'),
+                      child: Text(
+                        'Add projects',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                      ),
+                    ),
+                  ),
+                  const TextSpan(text: ' so the AI can mention them.'),
+                ],
+              ),
+            ),
+          )
+        else
+          ..._projects.map((project) {
+            final selected = _selectedProjectIds.contains(project.id);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: selected,
+                    onChanged: (value) =>
+                        _toggleProject(project.id, value ?? false),
+                    title: Text(project.name),
+                    subtitle: Text(
+                      _projectPreview(project),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (selected) ...[
+                    CheckboxListTile(
+                      contentPadding: const EdgeInsets.only(left: 24),
+                      dense: true,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: _describeProjectIds.contains(project.id),
+                      onChanged: (value) =>
+                          _toggleDescribe(project.id, value ?? false),
+                      title: const Text('Describe it'),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 24),
+                      child: TextField(
+                        controller: _noteControllerFor(project.id),
+                        maxLength: 500,
+                        decoration: const InputDecoration(
+                          labelText: 'Specific note',
+                          alignLabelWithHint: true,
+                          hintText:
+                              'e.g. how you improved this app\'s security',
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }),
         const SizedBox(height: 16),
         Text('Language', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),

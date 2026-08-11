@@ -3,6 +3,7 @@ const geminiClient = require('./geminiClient');
 
 const MAX_JOB_DESCRIPTION_LENGTH = 8000;
 const MAX_NOTES_LENGTH = 2000;
+const MAX_MENTION_NOTE_LENGTH = 500;
 const ALLOWED_DOMAINS = new Set([
   'ecommerce',
   'marketplace',
@@ -13,6 +14,13 @@ const ALLOWED_DOMAINS = new Set([
   'fintech',
   'healthcare',
   'gaming',
+  'restaurant',
+  'realEstate',
+  'saas',
+  'logistics',
+  'travel',
+  'fitness',
+  'agency',
   'other',
 ]);
 
@@ -115,6 +123,13 @@ function normalizeSolutions(raw) {
   });
 }
 
+function normalizeMentionNote(raw) {
+  if (raw == null) return null;
+  const trimmed = String(raw).trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, MAX_MENTION_NOTE_LENGTH);
+}
+
 function normalizeProjects(raw) {
   if (raw == null) return [];
   if (!Array.isArray(raw)) {
@@ -122,12 +137,15 @@ function normalizeProjects(raw) {
   }
   return raw.slice(0, 10).map((item) => ({
     name: String(item?.name || '').trim(),
+    description: item?.description ? String(item.description).trim() || null : null,
     types: Array.isArray(item?.types)
       ? item.types.map(String)
       : [],
     playStoreUrl: item?.playStoreUrl ? String(item.playStoreUrl) : null,
     appStoreUrl: item?.appStoreUrl ? String(item.appStoreUrl) : null,
     webUrl: item?.webUrl ? String(item.webUrl) : null,
+    describe: Boolean(item?.describe),
+    mentionNote: normalizeMentionNote(item?.mentionNote),
   })).filter((p) => p.name);
 }
 
@@ -250,13 +268,18 @@ async function draftProposal({
 Write a problem-first proposal in this structure:
 1. Hook: acknowledge the real risks / issues for this ${domainNorm} job
 2. For each issue: briefly state the issue and your concrete solution
-3. Proof: mention 1–2 projects from the list below by name, and include a store/web URL when provided
+3. Proof: mention every project from the list below by name. Follow each project's describe / mentionNote flags:
+   - If describe is false: mention the project by name and include a store/web URL when provided. Do not copy, paraphrase, or expand the stored description.
+   - If describe is true: rewrite how the project is relevant to THIS job. Do not paste or lightly rephrase the stored description. Use it as source material, then connect it to the posting (e.g. if the job is security-related and the project involved security work, explain how you improved that app's security). Never invent work that is not in the description or mentionNote.
+   - Always honor mentionNote when present (even if describe is false — use it as a short hint, not a long paragraph).
 4. Clear CTA (short call to discuss approach / timeline)
 
 Rules:
 - Language: ${lang}
-- Keep it concise (about 150–280 words)
-- Do NOT invent metrics, years of experience, or apps that are not in the projects list
+- Keep it concise (about 150–320 words; longer only if needed to mention every selected project)
+- Do NOT invent metrics, years of experience, features, or apps that are not in the projects list
+- Ground project proof only in the provided descriptions and mentionNotes — do not invent what a project does
+- If describe is false, do not copy-paste or expand the stored description
 - If projects list is empty, skip the proof section rather than fabricating
 - If a template style is provided, match its tone and structure without copying it blindly
 ${client ? `- You may address the client as ${client}` : '- Do not invent a client name'}

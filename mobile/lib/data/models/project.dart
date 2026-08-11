@@ -78,6 +78,7 @@ class Project {
   const Project({
     required this.id,
     required this.name,
+    this.description,
     this.playStoreUrl,
     this.appStoreUrl,
     this.webUrl,
@@ -88,6 +89,7 @@ class Project {
 
   final String id;
   final String name;
+  final String? description;
   final String? playStoreUrl;
   final String? appStoreUrl;
   final String? webUrl;
@@ -102,12 +104,14 @@ class Project {
   Project copyWith({
     String? id,
     String? name,
+    String? description,
     String? playStoreUrl,
     String? appStoreUrl,
     String? webUrl,
     List<ProjectType>? types,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool clearDescription = false,
     bool clearPlayStoreUrl = false,
     bool clearAppStoreUrl = false,
     bool clearWebUrl = false,
@@ -115,6 +119,8 @@ class Project {
     return Project(
       id: id ?? this.id,
       name: name ?? this.name,
+      description:
+          clearDescription ? null : (description ?? this.description),
       playStoreUrl:
           clearPlayStoreUrl ? null : (playStoreUrl ?? this.playStoreUrl),
       appStoreUrl: clearAppStoreUrl ? null : (appStoreUrl ?? this.appStoreUrl),
@@ -129,6 +135,7 @@ class Project {
     return {
       'id': id,
       'name': name,
+      'description': description,
       'play_store_url': playStoreUrl,
       'app_store_url': appStoreUrl,
       'web_url': webUrl,
@@ -142,6 +149,7 @@ class Project {
     return Project(
       id: map['id'] as String,
       name: map['name'] as String,
+      description: map['description'] as String?,
       playStoreUrl: map['play_store_url'] as String?,
       appStoreUrl: map['app_store_url'] as String?,
       webUrl: map['web_url'] as String?,
@@ -155,6 +163,7 @@ class Project {
     return {
       'id': id,
       'name': name,
+      'description': description,
       'playStoreUrl': playStoreUrl,
       'appStoreUrl': appStoreUrl,
       'webUrl': webUrl,
@@ -168,6 +177,7 @@ class Project {
     return Project(
       id: json['id'] as String,
       name: json['name'] as String,
+      description: json['description'] as String?,
       playStoreUrl: json['playStoreUrl'] as String?,
       appStoreUrl: json['appStoreUrl'] as String?,
       webUrl: json['webUrl'] as String?,

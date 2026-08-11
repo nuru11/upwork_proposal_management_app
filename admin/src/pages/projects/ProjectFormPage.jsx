@@ -10,6 +10,7 @@ import { PORTFOLIO_TYPES } from '../../constants/enums';
 
 const blank = {
   name: '',
+  description: '',
   playStoreUrl: '',
   appStoreUrl: '',
   webUrl: '',
@@ -35,6 +36,7 @@ export default function ProjectFormPage() {
         if (!cancelled) {
           setForm({
             name: item.name || '',
+            description: item.description || '',
             playStoreUrl: item.playStoreUrl || '',
             appStoreUrl: item.appStoreUrl || '',
             webUrl: item.webUrl || '',
@@ -82,6 +84,7 @@ export default function ProjectFormPage() {
     const now = new Date().toISOString();
     const payload = {
       name: form.name.trim(),
+      description: form.description.trim() || null,
       playStoreUrl: playStoreUrl || null,
       appStoreUrl: appStoreUrl || null,
       webUrl: webUrl || null,
@@ -129,6 +132,16 @@ export default function ProjectFormPage() {
             value={form.name}
             onChange={(e) => setField('name', e.target.value)}
             required
+          />
+        </label>
+
+        <label className="field">
+          <span>Description</span>
+          <textarea
+            value={form.description}
+            onChange={(e) => setField('description', e.target.value)}
+            rows={4}
+            placeholder="Optional notes about this project"
           />
         </label>
 

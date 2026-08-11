@@ -30,6 +30,19 @@ export const PORTFOLIO_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
+/** Domains for the AI proposal wizard only (includes portfolio + extras). */
+export const AI_DOMAINS = [
+  ...PORTFOLIO_TYPES.filter((t) => t.value !== 'other'),
+  { value: 'restaurant', label: 'Restaurant' },
+  { value: 'realEstate', label: 'Real estate' },
+  { value: 'saas', label: 'SaaS' },
+  { value: 'logistics', label: 'Logistics' },
+  { value: 'travel', label: 'Travel' },
+  { value: 'fitness', label: 'Fitness' },
+  { value: 'agency', label: 'Agency' },
+  { value: 'other', label: 'Other' },
+];
+
 export const STATUS_COLORS = {
   submitted: { fg: '#64748b', bg: '#f1f5f9' },
   viewed: { fg: '#b45309', bg: '#fef3c7' },

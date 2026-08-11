@@ -1,3 +1,53 @@
+import 'project.dart';
+
+enum AiDomain {
+  ecommerce,
+  marketplace,
+  elearning,
+  booking,
+  social,
+  delivery,
+  fintech,
+  healthcare,
+  gaming,
+  restaurant,
+  realEstate,
+  saas,
+  logistics,
+  travel,
+  fitness,
+  agency,
+  other;
+
+  String get label => switch (this) {
+        AiDomain.ecommerce => 'Ecommerce',
+        AiDomain.marketplace => 'Marketplace',
+        AiDomain.elearning => 'E-learning',
+        AiDomain.booking => 'Booking',
+        AiDomain.social => 'Social',
+        AiDomain.delivery => 'Delivery',
+        AiDomain.fintech => 'Fintech',
+        AiDomain.healthcare => 'Healthcare',
+        AiDomain.gaming => 'Gaming',
+        AiDomain.restaurant => 'Restaurant',
+        AiDomain.realEstate => 'Real estate',
+        AiDomain.saas => 'SaaS',
+        AiDomain.logistics => 'Logistics',
+        AiDomain.travel => 'Travel',
+        AiDomain.fitness => 'Fitness',
+        AiDomain.agency => 'Agency',
+        AiDomain.other => 'Other',
+      };
+
+  /// Portfolio project type when this AI domain overlaps; otherwise null.
+  ProjectType? get matchingProjectType {
+    for (final type in ProjectType.values) {
+      if (type.name == name) return type;
+    }
+    return null;
+  }
+}
+
 class AiIssue {
   const AiIssue({
     required this.id,
@@ -98,4 +148,16 @@ class AiWizardResult {
   const AiWizardResult({required this.body});
 
   final String body;
+}
+
+class AiProjectMention {
+  const AiProjectMention({
+    required this.project,
+    this.describe = false,
+    this.mentionNote,
+  });
+
+  final Project project;
+  final bool describe;
+  final String? mentionNote;
 }

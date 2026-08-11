@@ -10,7 +10,7 @@ class AppDatabase {
   Database get database => _db;
 
   static const _dbName = 'proposal_manager.db';
-  static const _dbVersion = 6;
+  static const _dbVersion = 8;
 
   static Future<AppDatabase> open() async {
     final documents = await getApplicationDocumentsDirectory();
@@ -73,6 +73,7 @@ class AppDatabase {
     );
 
     await _createProjects(db);
+    await _createAiDrafts(db);
     await _createSyncQueue(db);
   }
 
@@ -106,6 +107,12 @@ class AppDatabase {
     if (oldVersion < 6) {
       await _addProjectTypesColumn(db);
     }
+    if (oldVersion < 7) {
+      await _createAiDrafts(db);
+    }
+    if (oldVersion < 8) {
+      await _addProjectDescriptionColumn(db);
+    }
   }
 
   static Future<void> _createProjects(Database db) async {
@@ -113,6 +120,7 @@ class AppDatabase {
       CREATE TABLE IF NOT EXISTS projects (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        description TEXT,
         play_store_url TEXT,
         app_store_url TEXT,
         web_url TEXT,
@@ -131,6 +139,38 @@ class AppDatabase {
         'ALTER TABLE projects ADD COLUMN types TEXT NOT NULL DEFAULT \'["other"]\'',
       );
     }
+  }
+
+  static Future<void> _addProjectDescriptionColumn(Database db) async {
+    final info = await db.rawQuery('PRAGMA table_info(projects)');
+    final hasDescription = info.any((row) => row['name'] == 'description');
+    if (!hasDescription) {
+      await db.execute(
+        'ALTER TABLE projects ADD COLUMN description TEXT',
+      );
+    }
+  }
+
+  static Future<void> _createAiDrafts(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS ai_drafts (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        job_description TEXT NOT NULL,
+        notes TEXT,
+        domain TEXT NOT NULL,
+        language TEXT NOT NULL,
+        issues TEXT NOT NULL DEFAULT '[]',
+        solutions TEXT NOT NULL DEFAULT '[]',
+        body TEXT NOT NULL,
+        client_name TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_ai_drafts_updated_at ON ai_drafts(updated_at)',
+    );
   }
 
   static Future<void> _createSyncQueue(Database db) async {

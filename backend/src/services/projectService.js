@@ -78,11 +78,12 @@ async function create(userId, payload) {
 
   await query(
     `INSERT INTO projects (
-      id, user_id, name, play_store_url, app_store_url, web_url, types,
+      id, user_id, name, description, play_store_url, app_store_url, web_url, types,
       created_at, updated_at, deleted_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
     ON DUPLICATE KEY UPDATE
       name = VALUES(name),
+      description = VALUES(description),
       play_store_url = VALUES(play_store_url),
       app_store_url = VALUES(app_store_url),
       web_url = VALUES(web_url),
@@ -93,6 +94,7 @@ async function create(userId, payload) {
       payload.id,
       userId,
       cols.name,
+      cols.description,
       cols.play_store_url,
       cols.app_store_url,
       cols.web_url,
@@ -132,11 +134,12 @@ async function update(userId, id, payload) {
 
   await query(
     `UPDATE projects SET
-      name = ?, play_store_url = ?, app_store_url = ?, web_url = ?,
+      name = ?, description = ?, play_store_url = ?, app_store_url = ?, web_url = ?,
       types = ?, updated_at = ?, deleted_at = NULL
      WHERE id = ? AND user_id = ?`,
     [
       cols.name,
+      cols.description,
       cols.play_store_url,
       cols.app_store_url,
       cols.web_url,

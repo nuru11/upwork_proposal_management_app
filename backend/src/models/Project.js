@@ -44,6 +44,7 @@ function fromRow(row) {
   return {
     id: row.id,
     name: row.name,
+    description: row.description || null,
     playStoreUrl: row.play_store_url || null,
     appStoreUrl: row.app_store_url || null,
     webUrl: row.web_url || null,
@@ -58,6 +59,7 @@ function toDbColumns(payload) {
   const types = normalizeTypes(payload.types);
   return {
     name: payload.name,
+    description: payload.description?.trim() || null,
     play_store_url: payload.playStoreUrl || null,
     app_store_url: payload.appStoreUrl || null,
     web_url: payload.webUrl || null,
