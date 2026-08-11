@@ -14,6 +14,7 @@ import {
 const blank = {
   name: '',
   body: '',
+  inspiredFrom: '',
   language: 'english',
   projectType: 'mobileApp',
   isFavorite: false,
@@ -39,6 +40,7 @@ export default function TemplateFormPage() {
           setForm({
             name: item.name || '',
             body: item.body || '',
+            inspiredFrom: item.inspiredFrom || '',
             language: item.language || 'english',
             projectType: item.projectType || 'mobileApp',
             isFavorite: Boolean(item.isFavorite),
@@ -67,6 +69,7 @@ export default function TemplateFormPage() {
     const payload = {
       name: form.name.trim(),
       body: form.body,
+      inspiredFrom: form.inspiredFrom.trim() || null,
       language: form.language,
       projectType: form.projectType,
       isFavorite: form.isFavorite,
@@ -162,6 +165,16 @@ export default function TemplateFormPage() {
             value={form.body}
             onChange={(e) => setField('body', e.target.value)}
             required
+          />
+        </label>
+
+        <label className="field">
+          <span>Inspired from</span>
+          <textarea
+            rows={8}
+            value={form.inspiredFrom}
+            onChange={(e) => setField('inspiredFrom', e.target.value)}
+            placeholder="Original example this template was based on"
           />
         </label>
 

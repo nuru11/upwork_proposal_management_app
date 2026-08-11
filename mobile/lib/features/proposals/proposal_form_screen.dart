@@ -163,6 +163,7 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
       '/proposals/ai-wizard',
       extra: AiWizardArgs(
         initialLanguage: _language.name,
+        templateId: _templateId,
         templateBody: _templateBody,
         clientName: _clientController.text.trim().isEmpty
             ? null

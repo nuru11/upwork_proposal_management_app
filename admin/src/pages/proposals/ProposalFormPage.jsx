@@ -132,6 +132,7 @@ export default function ProposalFormPage() {
         formSnapshot: form,
         language: form.language,
         clientName: form.clientName,
+        templateId: selectedTemplate?.id || '',
         templateBody: selectedTemplate?.body || '',
       },
     });

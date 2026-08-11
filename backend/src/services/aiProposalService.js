@@ -250,6 +250,7 @@ async function draftProposal({
   solutions,
   projects,
   templateBody,
+  inspiredFrom,
   clientName,
   notes,
 }) {
@@ -261,7 +262,19 @@ async function draftProposal({
   const projectsNorm = normalizeProjects(projects);
   const notesNorm = normalizeNotes(notes);
   const template = templateBody ? String(templateBody).trim().slice(0, 4000) : '';
+  const inspired = inspiredFrom ? String(inspiredFrom).trim().slice(0, 4000) : '';
   const client = clientName ? String(clientName).trim().slice(0, 120) : '';
+
+  const templateRules = [
+    template
+      ? '- If a template skeleton is provided, match its structure and fill every [placeholder] for this job. Do not leave bracket placeholders in the output.'
+      : '',
+    inspired
+      ? '- If an inspired-from example is provided, match its tone and flow. Do not copy names, metrics, or project specifics from that example.'
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   const prompt = `You write short, high-converting Upwork cover letters for a freelance developer.
 
@@ -281,7 +294,7 @@ Rules:
 - Ground project proof only in the provided descriptions and mentionNotes — do not invent what a project does
 - If describe is false, do not copy-paste or expand the stored description
 - If projects list is empty, skip the proof section rather than fabricating
-- If a template style is provided, match its tone and structure without copying it blindly
+${templateRules}
 ${client ? `- You may address the client as ${client}` : '- Do not invent a client name'}
 
 Job posting:
@@ -298,7 +311,8 @@ ${JSON.stringify(solutionsNorm, null, 2)}
 My relevant projects (only use these):
 ${JSON.stringify(projectsNorm, null, 2)}
 
-${template ? `Template style to roughly follow:\n"""\n${template}\n"""` : ''}
+${template ? `Template skeleton to follow (fill placeholders for this job):\n"""\n${template}\n"""` : ''}
+${inspired ? `Inspired-from example (tone and flow only — do not copy specifics):\n"""\n${inspired}\n"""` : ''}
 
 Respond with JSON only in this exact shape:
 {

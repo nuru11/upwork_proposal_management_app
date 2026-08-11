@@ -7,6 +7,7 @@ import '../../data/models/ai_draft.dart';
 import '../../data/models/ai_proposal.dart';
 import '../../data/models/project.dart';
 import '../../data/models/proposal.dart';
+import '../../data/models/template.dart';
 import '../../data/remote/api_client.dart';
 import '../../providers/providers.dart';
 import '../../shared/theme/app_theme.dart';
@@ -33,7 +34,8 @@ class _AiProposalWizardScreenState
 
   AiDomain _domain = AiDomain.marketplace;
   ProposalLanguage _language = ProposalLanguage.english;
-  bool _useTemplate = false;
+  List<ProposalTemplate> _templates = [];
+  String? _selectedTemplateId;
 
   List<AiIssue> _issues = [];
   final Map<String, TextEditingController> _issueTitleControllers = {};
@@ -54,10 +56,38 @@ class _AiProposalWizardScreenState
     if (args?.initialLanguage != null) {
       _language = ProposalLanguage.fromStorage(args!.initialLanguage!);
     }
-    if (args?.templateBody != null && args!.templateBody!.trim().isNotEmpty) {
-      _useTemplate = true;
+    final initialTemplateId = args?.templateId?.trim();
+    if (initialTemplateId != null && initialTemplateId.isNotEmpty) {
+      _selectedTemplateId = initialTemplateId;
     }
     _loadProjects();
+    _loadTemplates();
+  }
+
+  Future<void> _loadTemplates() async {
+    try {
+      final list = await ref.read(templateRepositoryProvider).getAll();
+      if (!mounted) return;
+      setState(() {
+        _templates = list;
+        if (_selectedTemplateId != null &&
+            list.every((t) => t.id != _selectedTemplateId)) {
+          _selectedTemplateId = null;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error ??= _friendlyError(e));
+    }
+  }
+
+  ProposalTemplate? get _selectedTemplate {
+    final id = _selectedTemplateId;
+    if (id == null) return null;
+    for (final template in _templates) {
+      if (template.id == id) return template;
+    }
+    return null;
   }
 
   Future<void> _loadProjects() async {
@@ -153,10 +183,15 @@ class _AiProposalWizardScreenState
   }
 
   String? get _templateBody {
-    if (!_useTemplate) return null;
-    final body = widget.args?.templateBody?.trim();
+    final body = _selectedTemplate?.body.trim();
     if (body == null || body.isEmpty) return null;
     return body;
+  }
+
+  String? get _inspiredFrom {
+    final text = _selectedTemplate?.inspiredFrom?.trim();
+    if (text == null || text.isEmpty) return null;
+    return text;
   }
 
   String? get _guidanceNotes {
@@ -348,6 +383,7 @@ class _AiProposalWizardScreenState
             solutions: solutions,
             projects: selectedProjects,
             templateBody: _templateBody,
+            inspiredFrom: _inspiredFrom,
             clientName: widget.args?.clientName,
             notes: _guidanceNotes,
           );
@@ -438,8 +474,6 @@ class _AiProposalWizardScreenState
 
   @override
   Widget build(BuildContext context) {
-    final hasTemplate = (widget.args?.templateBody?.trim().isNotEmpty ?? false);
-
     return Scaffold(
       appBar: AppBar(
         title: Text(_stepTitle),
@@ -480,7 +514,7 @@ class _AiProposalWizardScreenState
             child: AbsorbPointer(
               absorbing: _loading,
               child: switch (_step) {
-                0 => _buildInputStep(hasTemplate: hasTemplate),
+                0 => _buildInputStep(),
                 1 => _buildIssuesStep(),
                 2 => _buildSolutionsStep(),
                 _ => _buildDraftStep(),
@@ -547,7 +581,7 @@ class _AiProposalWizardScreenState
         _ => _useDraft,
       };
 
-  Widget _buildInputStep({required bool hasTemplate}) {
+  Widget _buildInputStep() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
@@ -716,18 +750,34 @@ class _AiProposalWizardScreenState
             setState(() => _language = set.first);
           },
         ),
-        if (hasTemplate) ...[
-          const SizedBox(height: 16),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Use current template style'),
-            subtitle: const Text(
-              'Match tone/structure of the template selected on the form',
-            ),
-            value: _useTemplate,
-            onChanged: (v) => setState(() => _useTemplate = v),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String?>(
+          key: ValueKey('inspire-template-$_selectedTemplateId-${_templates.length}'),
+          initialValue: _templates.any((t) => t.id == _selectedTemplateId)
+              ? _selectedTemplateId
+              : null,
+          decoration: const InputDecoration(
+            labelText: 'Inspire from template',
           ),
-        ],
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('None'),
+            ),
+            ..._templates.map(
+              (template) => DropdownMenuItem<String?>(
+                value: template.id,
+                child: Text(
+                  '${template.name} (${template.projectType.label})',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ],
+          onChanged: (value) {
+            setState(() => _selectedTemplateId = value);
+          },
+        ),
       ],
     );
   }

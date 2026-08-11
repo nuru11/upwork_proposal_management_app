@@ -7,6 +7,7 @@ function fromRow(row) {
     id: row.id,
     name: row.name,
     body: row.body,
+    inspiredFrom: row.inspired_from || null,
     language: row.language,
     projectType: row.project_type,
     isFavorite: Boolean(row.is_favorite),
@@ -20,6 +21,7 @@ function toDbColumns(payload) {
   return {
     name: payload.name,
     body: payload.body,
+    inspired_from: payload.inspiredFrom?.trim() || null,
     language: payload.language,
     project_type: payload.projectType,
     is_favorite: payload.isFavorite ? 1 : 0,

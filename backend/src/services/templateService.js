@@ -48,12 +48,13 @@ async function create(userId, payload) {
 
   await query(
     `INSERT INTO templates (
-      id, user_id, name, body, language, project_type, is_favorite,
+      id, user_id, name, body, inspired_from, language, project_type, is_favorite,
       created_at, updated_at, deleted_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
     ON DUPLICATE KEY UPDATE
       name = VALUES(name),
       body = VALUES(body),
+      inspired_from = VALUES(inspired_from),
       language = VALUES(language),
       project_type = VALUES(project_type),
       is_favorite = VALUES(is_favorite),
@@ -64,6 +65,7 @@ async function create(userId, payload) {
       userId,
       cols.name,
       cols.body,
+      cols.inspired_from,
       cols.language,
       cols.project_type,
       cols.is_favorite,
@@ -93,12 +95,13 @@ async function update(userId, id, payload) {
 
   await query(
     `UPDATE templates SET
-      name = ?, body = ?, language = ?, project_type = ?, is_favorite = ?,
-      updated_at = ?, deleted_at = NULL
+      name = ?, body = ?, inspired_from = ?, language = ?, project_type = ?,
+      is_favorite = ?, updated_at = ?, deleted_at = NULL
      WHERE id = ? AND user_id = ?`,
     [
       cols.name,
       cols.body,
+      cols.inspired_from,
       cols.language,
       cols.project_type,
       cols.is_favorite,

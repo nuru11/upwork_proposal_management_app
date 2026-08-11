@@ -5,6 +5,7 @@ class ProposalTemplate {
     required this.id,
     required this.name,
     required this.body,
+    this.inspiredFrom,
     required this.language,
     required this.projectType,
     required this.isFavorite,
@@ -15,6 +16,7 @@ class ProposalTemplate {
   final String id;
   final String name;
   final String body;
+  final String? inspiredFrom;
   final ProposalLanguage language;
   final ProposalProjectType projectType;
   final bool isFavorite;
@@ -25,6 +27,8 @@ class ProposalTemplate {
     String? id,
     String? name,
     String? body,
+    String? inspiredFrom,
+    bool clearInspiredFrom = false,
     ProposalLanguage? language,
     ProposalProjectType? projectType,
     bool? isFavorite,
@@ -35,6 +39,8 @@ class ProposalTemplate {
       id: id ?? this.id,
       name: name ?? this.name,
       body: body ?? this.body,
+      inspiredFrom:
+          clearInspiredFrom ? null : (inspiredFrom ?? this.inspiredFrom),
       language: language ?? this.language,
       projectType: projectType ?? this.projectType,
       isFavorite: isFavorite ?? this.isFavorite,
@@ -48,6 +54,7 @@ class ProposalTemplate {
       'id': id,
       'name': name,
       'body': body,
+      'inspired_from': inspiredFrom,
       'language': language.name,
       'project_type': projectType.name,
       'is_favorite': isFavorite ? 1 : 0,
@@ -61,6 +68,7 @@ class ProposalTemplate {
       id: map['id'] as String,
       name: map['name'] as String,
       body: map['body'] as String,
+      inspiredFrom: map['inspired_from'] as String?,
       language: ProposalLanguage.fromStorage(map['language'] as String),
       projectType: ProposalProjectType.fromStorage(
         (map['project_type'] as String?) ?? 'other',
@@ -76,6 +84,7 @@ class ProposalTemplate {
       'id': id,
       'name': name,
       'body': body,
+      'inspiredFrom': inspiredFrom,
       'language': language.name,
       'projectType': projectType.name,
       'isFavorite': isFavorite,
@@ -89,6 +98,7 @@ class ProposalTemplate {
       id: json['id'] as String,
       name: json['name'] as String,
       body: json['body'] as String,
+      inspiredFrom: json['inspiredFrom'] as String?,
       language: ProposalLanguage.fromStorage(json['language'] as String),
       projectType: ProposalProjectType.fromStorage(
         (json['projectType'] as String?) ?? 'other',

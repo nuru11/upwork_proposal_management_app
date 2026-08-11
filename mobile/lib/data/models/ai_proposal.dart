@@ -135,11 +135,13 @@ class AiSolution {
 class AiWizardArgs {
   const AiWizardArgs({
     this.initialLanguage,
+    this.templateId,
     this.templateBody,
     this.clientName,
   });
 
   final String? initialLanguage;
+  final String? templateId;
   final String? templateBody;
   final String? clientName;
 }

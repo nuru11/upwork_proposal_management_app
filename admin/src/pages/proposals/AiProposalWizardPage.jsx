@@ -3,7 +3,13 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { draftProposal, extractIssues, suggestSolutions } from '../../api/ai';
 import { createAiDraft, titleFromJob } from '../../api/aiDrafts';
 import { listProjects } from '../../api/projects';
-import { LANGUAGES, AI_DOMAINS } from '../../constants/enums';
+import { listTemplates } from '../../api/templates';
+import {
+  LANGUAGES,
+  AI_DOMAINS,
+  PROPOSAL_PROJECT_TYPES,
+  labelFor,
+} from '../../constants/enums';
 
 const STEPS = ['Job', 'Issues', 'Solutions', 'Draft'];
 
@@ -27,7 +33,8 @@ export default function AiProposalWizardPage() {
   const returnTo = incoming.returnTo || '/proposals/new';
   const formSnapshot = incoming.formSnapshot || null;
   const initialLanguage = incoming.language || formSnapshot?.language || 'english';
-  const templateBody = incoming.templateBody || '';
+  const incomingTemplateId =
+    incoming.templateId || formSnapshot?.templateId || '';
   const clientName = incoming.clientName || formSnapshot?.clientName || '';
 
   const [step, setStep] = useState(0);
@@ -38,7 +45,8 @@ export default function AiProposalWizardPage() {
   const [notes, setNotes] = useState('');
   const [domain, setDomain] = useState('marketplace');
   const [language, setLanguage] = useState(initialLanguage);
-  const [useTemplate, setUseTemplate] = useState(Boolean(templateBody.trim()));
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(incomingTemplateId);
 
   const [issues, setIssues] = useState([]);
   const [solutions, setSolutions] = useState([]);
@@ -52,15 +60,24 @@ export default function AiProposalWizardPage() {
   const [projectNotes, setProjectNotes] = useState({});
   const [projectsLoading, setProjectsLoading] = useState(true);
 
+  const selectedTemplate = useMemo(
+    () => templates.find((t) => t.id === selectedTemplateId) || null,
+    [templates, selectedTemplateId],
+  );
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const list = await listProjects();
+        const [projectList, templateList] = await Promise.all([
+          listProjects(),
+          listTemplates(),
+        ]);
         if (cancelled) return;
-        const items = list || [];
+        const items = projectList || [];
         setProjects(items);
         setSelectedProjectIds(new Set(matchingProjectIds(items, domain)));
+        setTemplates(templateList || []);
       } catch (err) {
         if (!cancelled) setError(err.message || 'Failed to load projects');
       } finally {
@@ -238,8 +255,8 @@ export default function AiProposalWizardPage() {
           describe: describeProjectIds.has(p.id),
           mentionNote: (projectNotes[p.id] || '').trim() || null,
         })),
-        templateBody:
-          useTemplate && templateBody.trim() ? templateBody.trim() : undefined,
+        templateBody: selectedTemplate?.body?.trim() || undefined,
+        inspiredFrom: selectedTemplate?.inspiredFrom?.trim() || undefined,
         clientName: clientName.trim() || undefined,
         notes: guidanceNotes,
       });
@@ -492,17 +509,21 @@ export default function AiProposalWizardPage() {
             </select>
           </label>
 
-          {templateBody.trim() ? (
-            <label className="field checkbox-field">
-              <input
-                type="checkbox"
-                checked={useTemplate}
-                onChange={(e) => setUseTemplate(e.target.checked)}
-                disabled={busy}
-              />
-              <span>Use current template style</span>
-            </label>
-          ) : null}
+          <label className="field">
+            <span>Inspire from template</span>
+            <select
+              value={selectedTemplateId}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+              disabled={busy}
+            >
+              <option value="">None</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({labelFor(PROPOSAL_PROJECT_TYPES, t.projectType)})
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       ) : null}
 

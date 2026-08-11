@@ -23,6 +23,7 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _bodyController = TextEditingController();
+  final _inspiredFromController = TextEditingController();
 
   ProposalLanguage _language = ProposalLanguage.english;
   ProposalProjectType _projectType = ProposalProjectType.mobileApp;
@@ -34,6 +35,7 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
   void dispose() {
     _nameController.dispose();
     _bodyController.dispose();
+    _inspiredFromController.dispose();
     super.dispose();
   }
 
@@ -41,6 +43,7 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
     if (_loaded) return;
     _nameController.text = template.name;
     _bodyController.text = template.body;
+    _inspiredFromController.text = template.inspiredFrom ?? '';
     _language = template.language;
     _projectType = template.projectType;
     _isFavorite = template.isFavorite;
@@ -52,10 +55,12 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
     setState(() => _saving = true);
 
     final now = DateTime.now();
+    final inspiredFrom = _inspiredFromController.text.trim();
     final template = ProposalTemplate(
       id: existing?.id ?? const Uuid().v4(),
       name: _nameController.text.trim(),
       body: _bodyController.text.trim(),
+      inspiredFrom: inspiredFrom.isEmpty ? null : inspiredFrom,
       language: _language,
       projectType: _projectType,
       isFavorite: _isFavorite,
@@ -214,6 +219,20 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
                   }
                   return null;
                 },
+              ),
+            ),
+            const SizedBox(height: 16),
+            Directionality(
+              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+              child: TextFormField(
+                controller: _inspiredFromController,
+                decoration: const InputDecoration(
+                  labelText: 'Inspired from',
+                  alignLabelWithHint: true,
+                  hintText: 'Original example this template was based on',
+                ),
+                minLines: 6,
+                maxLines: 14,
               ),
             ),
             const SizedBox(height: 24),

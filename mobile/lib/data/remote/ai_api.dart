@@ -54,6 +54,7 @@ class AiApi {
     required List<AiSolution> solutions,
     required List<AiProjectMention> projects,
     String? templateBody,
+    String? inspiredFrom,
     String? clientName,
     String? notes,
   }) async {
@@ -83,6 +84,8 @@ class AiApi {
           .toList(),
       if (templateBody != null && templateBody.isNotEmpty)
         'templateBody': templateBody,
+      if (inspiredFrom != null && inspiredFrom.isNotEmpty)
+        'inspiredFrom': inspiredFrom,
       if (clientName != null && clientName.isNotEmpty) 'clientName': clientName,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
     });

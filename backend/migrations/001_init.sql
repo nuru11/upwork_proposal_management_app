@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS templates (
   user_id CHAR(36) NOT NULL,
   name VARCHAR(255) NOT NULL,
   body MEDIUMTEXT NOT NULL,
+  inspired_from MEDIUMTEXT NULL,
   language VARCHAR(32) NOT NULL,
   project_type VARCHAR(32) NOT NULL,
   is_favorite TINYINT(1) NOT NULL DEFAULT 0,

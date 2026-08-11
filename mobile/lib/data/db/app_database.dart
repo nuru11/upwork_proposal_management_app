@@ -10,7 +10,7 @@ class AppDatabase {
   Database get database => _db;
 
   static const _dbName = 'proposal_manager.db';
-  static const _dbVersion = 8;
+  static const _dbVersion = 9;
 
   static Future<AppDatabase> open() async {
     final documents = await getApplicationDocumentsDirectory();
@@ -30,6 +30,7 @@ class AppDatabase {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         body TEXT NOT NULL,
+        inspired_from TEXT,
         language TEXT NOT NULL,
         project_type TEXT NOT NULL DEFAULT 'other',
         is_favorite INTEGER NOT NULL DEFAULT 0,
@@ -113,6 +114,9 @@ class AppDatabase {
     if (oldVersion < 8) {
       await _addProjectDescriptionColumn(db);
     }
+    if (oldVersion < 9) {
+      await _addTemplateInspiredFromColumn(db);
+    }
   }
 
   static Future<void> _createProjects(Database db) async {
@@ -138,6 +142,14 @@ class AppDatabase {
       await db.execute(
         'ALTER TABLE projects ADD COLUMN types TEXT NOT NULL DEFAULT \'["other"]\'',
       );
+    }
+  }
+
+  static Future<void> _addTemplateInspiredFromColumn(Database db) async {
+    final info = await db.rawQuery('PRAGMA table_info(templates)');
+    final hasInspiredFrom = info.any((row) => row['name'] == 'inspired_from');
+    if (!hasInspiredFrom) {
+      await db.execute('ALTER TABLE templates ADD COLUMN inspired_from TEXT');
     }
   }
 
