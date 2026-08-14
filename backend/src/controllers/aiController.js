@@ -27,8 +27,20 @@ async function draftProposal(req, res) {
   }
 }
 
+async function draftProposalFromTemplate(req, res) {
+  try {
+    const result = await aiProposalService.draftProposalFromTemplate(
+      req.body || {},
+    );
+    return res.json(result);
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+}
+
 module.exports = {
   extractIssues,
   suggestSolutions,
   draftProposal,
+  draftProposalFromTemplate,
 };

@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 class AppDatabase {
   AppDatabase._(this._db);
@@ -13,8 +15,12 @@ class AppDatabase {
   static const _dbVersion = 9;
 
   static Future<AppDatabase> open() async {
-    final documents = await getApplicationDocumentsDirectory();
-    final dbPath = join(documents.path, _dbName);
+    if (kIsWeb) {
+      databaseFactory = databaseFactoryFfiWeb;
+    }
+    final dbPath = kIsWeb
+        ? _dbName
+        : join((await getApplicationDocumentsDirectory()).path, _dbName);
     final db = await openDatabase(
       dbPath,
       version: _dbVersion,

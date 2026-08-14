@@ -34,6 +34,7 @@ class _AiProposalWizardScreenState
 
   AiDomain _domain = AiDomain.marketplace;
   ProposalLanguage _language = ProposalLanguage.english;
+  late AiWizardMode _mode;
   List<ProposalTemplate> _templates = [];
   String? _selectedTemplateId;
 
@@ -60,8 +61,25 @@ class _AiProposalWizardScreenState
     if (initialTemplateId != null && initialTemplateId.isNotEmpty) {
       _selectedTemplateId = initialTemplateId;
     }
+    _mode = args?.mode ?? AiWizardMode.ai;
     _loadProjects();
     _loadTemplates();
+  }
+
+  bool get _fromTemplate => _mode == AiWizardMode.fromTemplate;
+
+  int get _draftStep => _fromTemplate ? 1 : 3;
+
+  void _setMode(AiWizardMode mode) {
+    setState(() {
+      _mode = mode;
+      _error = null;
+      if (mode == AiWizardMode.fromTemplate &&
+          _selectedTemplateId == null &&
+          _templates.isNotEmpty) {
+        _selectedTemplateId = _templates.first.id;
+      }
+    });
   }
 
   Future<void> _loadTemplates() async {
@@ -70,9 +88,12 @@ class _AiProposalWizardScreenState
       if (!mounted) return;
       setState(() {
         _templates = list;
-        if (_selectedTemplateId != null &&
-            list.every((t) => t.id != _selectedTemplateId)) {
-          _selectedTemplateId = null;
+        final selectedMissing = _selectedTemplateId == null ||
+            list.every((t) => t.id != _selectedTemplateId);
+        if (selectedMissing) {
+          _selectedTemplateId = _fromTemplate && list.isNotEmpty
+              ? list.first.id
+              : null;
         }
       });
     } catch (e) {
@@ -266,6 +287,19 @@ class _AiProposalWizardScreenState
         .toList();
   }
 
+  List<AiProjectMention> _selectedProjectMentions() {
+    return _projects
+        .where((p) => _selectedProjectIds.contains(p.id))
+        .map(
+          (p) => AiProjectMention(
+            project: p,
+            describe: _describeProjectIds.contains(p.id),
+            mentionNote: _projectNoteControllers[p.id]?.text.trim(),
+          ),
+        )
+        .toList();
+  }
+
   Future<void> _extractIssues() async {
     final job = _jobController.text.trim();
     if (job.isEmpty) {
@@ -364,24 +398,13 @@ class _AiProposalWizardScreenState
     });
 
     try {
-      final selectedProjects = _projects
-          .where((p) => _selectedProjectIds.contains(p.id))
-          .map(
-            (p) => AiProjectMention(
-              project: p,
-              describe: _describeProjectIds.contains(p.id),
-              mentionNote: _projectNoteControllers[p.id]?.text.trim(),
-            ),
-          )
-          .toList();
-
       final body = await ref.read(aiApiProvider).draftProposal(
             jobDescription: _jobController.text.trim(),
             domain: _domain.name,
             language: _language.name,
             issues: selected,
             solutions: solutions,
-            projects: selectedProjects,
+            projects: _selectedProjectMentions(),
             templateBody: _templateBody,
             inspiredFrom: _inspiredFrom,
             clientName: widget.args?.clientName,
@@ -398,6 +421,56 @@ class _AiProposalWizardScreenState
       _draftController.text = body;
       setState(() {
         _step = 3;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = _friendlyError(e);
+      });
+    }
+  }
+
+  Future<void> _draftFromTemplate() async {
+    final job = _jobController.text.trim();
+    if (job.isEmpty) {
+      setState(() => _error = 'Paste a job description first.');
+      return;
+    }
+    final templateBody = _templateBody;
+    if (templateBody == null) {
+      setState(() => _error = 'Select a template first.');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final body = await ref.read(aiApiProvider).draftProposalFromTemplate(
+            jobDescription: job,
+            domain: _domain.name,
+            language: _language.name,
+            templateBody: templateBody,
+            projects: _selectedProjectMentions(),
+            inspiredFrom: _inspiredFrom,
+            clientName: widget.args?.clientName,
+            notes: _guidanceNotes,
+          );
+      if (!mounted) return;
+      if (body.trim().isEmpty) {
+        setState(() {
+          _loading = false;
+          _error = 'Empty draft returned. Try again.';
+        });
+        return;
+      }
+      _draftController.text = body;
+      setState(() {
+        _step = _draftStep;
         _loading = false;
       });
     } catch (e) {
@@ -464,13 +537,18 @@ class _AiProposalWizardScreenState
     }
   }
 
-  String get _stepTitle => switch (_step) {
-        0 => 'Job & domain',
-        1 => 'Common issues',
-        2 => 'Solutions to offer',
-        3 => 'Proposal draft',
-        _ => 'AI wizard',
-      };
+  String get _stepTitle {
+    if (_fromTemplate) {
+      return _step == 0 ? 'Job & template' : 'Proposal draft';
+    }
+    return switch (_step) {
+      0 => 'Job & domain',
+      1 => 'Common issues',
+      2 => 'Solutions to offer',
+      3 => 'Proposal draft',
+      _ => 'AI wizard',
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -481,7 +559,12 @@ class _AiProposalWizardScreenState
           preferredSize: const Size.fromHeight(28),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: _StepIndicator(step: _step),
+            child: _StepIndicator(
+              step: _step,
+              labels: _fromTemplate
+                  ? const ['Job', 'Draft']
+                  : const ['Job', 'Issues', 'Solutions', 'Draft'],
+            ),
           ),
         ),
       ),
@@ -515,7 +598,7 @@ class _AiProposalWizardScreenState
               absorbing: _loading,
               child: switch (_step) {
                 0 => _buildInputStep(),
-                1 => _buildIssuesStep(),
+                1 => _fromTemplate ? _buildDraftStep() : _buildIssuesStep(),
                 2 => _buildSolutionsStep(),
                 _ => _buildDraftStep(),
               },
@@ -538,7 +621,7 @@ class _AiProposalWizardScreenState
                       child: const Text('Back'),
                     ),
                   const Spacer(),
-                  if (_step == 3) ...[
+                  if (_step == _draftStep) ...[
                     OutlinedButton(
                       onPressed: _loading ? null : _saveAiDraft,
                       child: const Text('Save AI draft'),
@@ -567,24 +650,52 @@ class _AiProposalWizardScreenState
     );
   }
 
-  String get _primaryLabel => switch (_step) {
-        0 => 'Extract issues',
-        1 => 'Suggest solutions',
-        2 => 'Generate draft',
-        _ => 'Use draft',
-      };
+  String get _primaryLabel {
+    if (_fromTemplate) {
+      return _step == 0 ? 'Generate draft' : 'Use draft';
+    }
+    return switch (_step) {
+      0 => 'Extract issues',
+      1 => 'Suggest solutions',
+      2 => 'Generate draft',
+      _ => 'Use draft',
+    };
+  }
 
-  VoidCallback get _primaryAction => switch (_step) {
-        0 => _extractIssues,
-        1 => _suggestSolutions,
-        2 => _draftProposal,
-        _ => _useDraft,
-      };
+  VoidCallback get _primaryAction {
+    if (_fromTemplate) {
+      return _step == 0 ? _draftFromTemplate : _useDraft;
+    }
+    return switch (_step) {
+      0 => _extractIssues,
+      1 => _suggestSolutions,
+      2 => _draftProposal,
+      _ => _useDraft,
+    };
+  }
 
   Widget _buildInputStep() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
+        Text('How to generate', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        SegmentedButton<AiWizardMode>(
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(
+              value: AiWizardMode.ai,
+              label: Text('With AI'),
+            ),
+            ButtonSegment(
+              value: AiWizardMode.fromTemplate,
+              label: Text('With template'),
+            ),
+          ],
+          selected: {_mode},
+          onSelectionChanged: (set) => _setMode(set.first),
+        ),
+        const SizedBox(height: 16),
         TextFormField(
           controller: _jobController,
           minLines: 8,
@@ -751,33 +862,49 @@ class _AiProposalWizardScreenState
           },
         ),
         const SizedBox(height: 16),
-        DropdownButtonFormField<String?>(
-          key: ValueKey('inspire-template-$_selectedTemplateId-${_templates.length}'),
-          initialValue: _templates.any((t) => t.id == _selectedTemplateId)
-              ? _selectedTemplateId
-              : null,
-          decoration: const InputDecoration(
-            labelText: 'Inspire from template',
-          ),
-          items: [
-            const DropdownMenuItem<String?>(
-              value: null,
-              child: Text('None'),
+        if (_fromTemplate && _templates.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 0),
+            child: Text(
+              'Add a template first so it can be filled for this job.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.slate500,
+                  ),
             ),
-            ..._templates.map(
-              (template) => DropdownMenuItem<String?>(
-                value: template.id,
-                child: Text(
-                  '${template.name} (${template.projectType.label})',
-                  overflow: TextOverflow.ellipsis,
+          )
+        else
+          DropdownButtonFormField<String?>(
+            key: ValueKey(
+              '${_fromTemplate ? 'template' : 'inspire'}-$_selectedTemplateId-${_templates.length}',
+            ),
+            initialValue: _templates.any((t) => t.id == _selectedTemplateId)
+                ? _selectedTemplateId
+                : null,
+            decoration: InputDecoration(
+              labelText: _fromTemplate
+                  ? 'Template *'
+                  : 'Inspire from template',
+            ),
+            items: [
+              if (!_fromTemplate)
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('None'),
+                ),
+              ..._templates.map(
+                (template) => DropdownMenuItem<String?>(
+                  value: template.id,
+                  child: Text(
+                    '${template.name} (${template.projectType.label})',
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
-            ),
-          ],
-          onChanged: (value) {
-            setState(() => _selectedTemplateId = value);
-          },
-        ),
+            ],
+            onChanged: (value) {
+              setState(() => _selectedTemplateId = value);
+            },
+          ),
       ],
     );
   }
@@ -1005,13 +1132,13 @@ class _AiProposalWizardScreenState
 }
 
 class _StepIndicator extends StatelessWidget {
-  const _StepIndicator({required this.step});
+  const _StepIndicator({required this.step, required this.labels});
 
   final int step;
+  final List<String> labels;
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['Job', 'Issues', 'Solutions', 'Draft'];
     return Row(
       children: [
         for (var i = 0; i < labels.length; i++) ...[

@@ -20,3 +20,10 @@ export function draftProposal(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export function draftProposalFromTemplate(payload) {
+  return api('/ai/draft-proposal-from-template', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

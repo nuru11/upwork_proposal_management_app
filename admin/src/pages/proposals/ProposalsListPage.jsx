@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { listProposals } from '../../api/proposals';
 import EmptyState from '../../components/EmptyState';
 import StatusBadge from '../../components/StatusBadge';
@@ -18,6 +18,7 @@ const emptyFilters = {
 };
 
 export default function ProposalsListPage() {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState(emptyFilters);
   const [applied, setApplied] = useState(emptyFilters);
   const [items, setItems] = useState([]);
@@ -57,9 +58,25 @@ export default function ProposalsListPage() {
     <div className="page">
       <div className="page-header">
         <h1>Proposals</h1>
-        <Link to="/proposals/new" className="btn btn-primary">
-          New proposal
-        </Link>
+        <div className="header-actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() =>
+              navigate('/proposals/ai-wizard', {
+                state: {
+                  returnTo: '/proposals/new',
+                  mode: 'fromTemplate',
+                },
+              })
+            }
+          >
+            Generate with template
+          </button>
+          <Link to="/proposals/new" className="btn btn-primary">
+            New proposal
+          </Link>
+        </div>
       </div>
 
       <form className="filters" onSubmit={applyFilters}>
@@ -117,9 +134,25 @@ export default function ProposalsListPage() {
           title="No proposals"
           message="Create your first proposal or adjust filters."
           action={
-            <Link to="/proposals/new" className="btn btn-primary">
-              New proposal
-            </Link>
+            <div className="header-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() =>
+                  navigate('/proposals/ai-wizard', {
+                    state: {
+                      returnTo: '/proposals/new',
+                      mode: 'fromTemplate',
+                    },
+                  })
+                }
+              >
+                Generate with template
+              </button>
+              <Link to="/proposals/new" className="btn btn-primary">
+                New proposal
+              </Link>
+            </div>
           }
         />
       ) : null}

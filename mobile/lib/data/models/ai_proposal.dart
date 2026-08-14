@@ -132,14 +132,18 @@ class AiSolution {
   }
 }
 
+enum AiWizardMode { ai, fromTemplate }
+
 class AiWizardArgs {
   const AiWizardArgs({
+    this.mode = AiWizardMode.ai,
     this.initialLanguage,
     this.templateId,
     this.templateBody,
     this.clientName,
   });
 
+  final AiWizardMode mode;
   final String? initialLanguage;
   final String? templateId;
   final String? templateBody;

@@ -158,10 +158,13 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
     });
   }
 
-  Future<void> _openAiWizard() async {
+  Future<void> _openAiWizard({
+    AiWizardMode mode = AiWizardMode.ai,
+  }) async {
     final result = await context.push<AiWizardResult>(
       '/proposals/ai-wizard',
       extra: AiWizardArgs(
+        mode: mode,
         initialLanguage: _language.name,
         templateId: _templateId,
         templateBody: _templateBody,
@@ -303,6 +306,12 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
               onPressed: _openAiWizard,
               icon: const Icon(Icons.psychology_outlined),
               label: const Text('Generate with AI'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => _openAiWizard(mode: AiWizardMode.fromTemplate),
+              icon: const Icon(Icons.article_outlined),
+              label: const Text('Generate with template'),
             ),
             const SizedBox(height: 16),
             TextFormField(

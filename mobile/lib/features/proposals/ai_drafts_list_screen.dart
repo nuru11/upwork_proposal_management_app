@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/models/ai_draft.dart';
+import '../../data/models/ai_proposal.dart';
 import '../../providers/providers.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/empty_state.dart';
@@ -51,6 +52,15 @@ class AiDraftsListScreen extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/proposals'),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => context.push(
+              '/proposals/ai-wizard',
+              extra: const AiWizardArgs(mode: AiWizardMode.fromTemplate),
+            ),
+            child: const Text('With template'),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/proposals/ai-wizard'),

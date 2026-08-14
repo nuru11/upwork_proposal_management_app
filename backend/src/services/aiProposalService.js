@@ -327,10 +327,113 @@ Respond with JSON only in this exact shape:
   return { body };
 }
 
+function projectProofRules(domainNorm) {
+  return `Project proof rules (for the similar-project hook and any portfolio link):
+- Mention every project from the list below by name. Follow each project's describe / mentionNote flags:
+  - If describe is false: mention the project by name and include a store/web URL when provided. Do not copy, paraphrase, or expand the stored description.
+  - If describe is true: rewrite how the project is relevant to THIS ${domainNorm} job. Do not paste or lightly rephrase the stored description. Use it as source material, then connect it to the posting. Never invent work that is not in the description or mentionNote.
+  - Always honor mentionNote when present (even if describe is false — use it as a short hint, not a long paragraph).
+- Ground project proof only in the provided descriptions and mentionNotes — do not invent what a project does`;
+}
+
+function languageInstructions(lang) {
+  if (lang === 'arabic') {
+    return `CRITICAL: The proposal body must be written entirely in Arabic.
+- Write the entire letter in simple everyday Arabic. Short sentences. Common words. Sound like a freelancer messaging a client, not a report.
+- Do NOT output English sentences. The JSON "body" value must be Arabic text.
+- The template skeleton and inspired-from example are English structure and tone only. Translate the flow into Arabic. Do not copy English wording.
+- Keep project names and URLs in their original form.
+- Greeting/sign-off in Arabic (e.g. مرحبا، / مع التحية،). Do not use Hi / Best.
+- Do NOT use stiff or translated-from-English phrasing. Keep it warm, direct, and a bit informal.
+- Keep it ~180–250 words.`;
+  }
+
+  return `Voice (must follow):
+- Simple everyday English. Short sentences. Common words. Contractions are good (I've, don't, it's).
+- Write like you are messaging a client, not writing a report.
+- Sound human: "I recently built", "these apps mostly fail because", "from my experience", "here is how I make sure".
+- Do NOT use buzzwords or stiff phrasing (no leverage, robust, seamless, cutting-edge, comprehensive, utilize, delve, landscape, furthermore, moreover, "I am writing to express").
+- Do NOT stack jargon. Explain problems in plain talk (laggy map, too many clicks, prices aren't clear).
+- Keep it ~180–250 words. Warm, direct, a bit informal.`;
+}
+
+async function draftProposalFromTemplate({
+  jobDescription,
+  domain,
+  language,
+  templateBody,
+  inspiredFrom,
+  projects,
+  clientName,
+  notes,
+}) {
+  const job = normalizeJobDescription(jobDescription);
+  const domainNorm = normalizeDomain(domain);
+  const lang = normalizeLanguage(language);
+  const projectsNorm = normalizeProjects(projects);
+  const notesNorm = normalizeNotes(notes);
+  const template = templateBody ? String(templateBody).trim().slice(0, 4000) : '';
+  if (!template) {
+    throw httpError(400, 'templateBody is required');
+  }
+  const inspired = inspiredFrom ? String(inspiredFrom).trim().slice(0, 4000) : '';
+  const client = clientName ? String(clientName).trim().slice(0, 120) : '';
+
+  const arabic = lang === 'arabic';
+  const prompt = `You write short Upwork cover letters that sound like a real freelancer typed them quickly — not like AI or a marketing page.
+
+Fill the template skeleton for this ${domainNorm} job. The skeleton is the structure of record — follow its paragraphs, greeting, "how I solve both" list, tech-stack suggestion, portfolio line, business question, and sign-off. Do NOT rewrite it as a problem-first Hook → per-issue → Proof → CTA letter.
+
+${languageInstructions(lang)}
+
+Rules:
+- Language: ${lang}${arabic ? ' (CRITICAL: body must be entirely in Arabic)' : ''}
+- Fill every [placeholder] for THIS job. Do not leave bracket placeholders in the output.
+- If an inspired-from example is provided, match its tone and flow only. Do not copy its names, metrics, project type, technical details, or CTA question unless they genuinely fit THIS job.${arabic ? ' Translate into Arabic; do not copy English sentences from the example or skeleton.' : ''}
+- For [X%]: one simple number in a plain sentence${arabic ? ' in Arabic' : ' (e.g. "Around 60% of users…")'}. Do not copy the inspired-from example's numbers.
+- For [Authoritative Source]: keep it casual${arabic ? ' in Arabic (e.g. دراسات تجربة المستخدم تبين)' : ', like "UX studies show" or "research shows"'}. Do not cite a fancy report name or sound academic.
+- For [Link to Demo / Portfolio]: use a selected project URL when provided. If the projects list is empty, write a short line that you are happy to share a similar build — do not invent a URL.
+- For [App Stack]: prefer Flutter. Use Capacitor only if the job is clearly a very small/simple app (few screens, mostly a site wrapper, no heavy native work like live GPS or matching). Fill [App Stack Reason] in plain talk (fast, one codebase, good for this project type).
+- For [Backend Stack]: prefer Node.js unless the posting clearly requires something else.
+- For [Hosting Suggestion]: pick what fits THIS job's stage. Early / MVP / cost-sensitive → VPS now, cloud later. If they already need scale or name a cloud, recommend that instead. Do not invent a budget. Keep it to one short sentence.
+- For [Business Question]: one short business question for THIS job (users, money, who to win first, why they leave a competitor). Not technical (no Flutter, APIs, hosting, GPS). Easy to answer in one sentence. The client should feel that answering it helps you make the app competitive. Do not copy the inspired-from question unless it truly fits this job.
+- Never invent a freelancer name. If the skeleton has [Your Name], sign off with ${arabic ? '"مع التحية،" only' : '"Best," only'}.
+- ${client ? `Address the client as ${client}` : arabic ? 'If the greeting has a client-name placeholder, use something like "مرحبا،" — do not invent a client name' : 'If the greeting has a client-name placeholder, use "there" — do not invent a client name'}.
+- ${projectProofRules(domainNorm)}
+- If the projects list is empty, still fill the similar-project hook in general terms without inventing a named app.
+
+Job posting:
+"""
+${job}
+"""
+${guidanceBlock(notesNorm)}
+My relevant projects (only use these):
+${JSON.stringify(projectsNorm, null, 2)}
+
+Template skeleton to follow (fill placeholders for this job):
+"""
+${template}
+"""
+${inspired ? `Inspired-from example (tone and flow only — do not copy specifics):\n"""\n${inspired}\n"""` : ''}
+
+Respond with JSON only in this exact shape:
+{
+  "body": "${arabic ? 'full proposal cover letter text, entirely in Arabic' : 'full proposal cover letter text'}"
+}`;
+
+  const result = await geminiClient.generateJson(prompt);
+  const body = String(result.body || '').trim();
+  if (!body) {
+    throw httpError(502, 'AI returned an empty proposal body');
+  }
+  return { body };
+}
+
 module.exports = {
   extractIssues,
   suggestSolutions,
   draftProposal,
+  draftProposalFromTemplate,
   ALLOWED_DOMAINS,
   MAX_JOB_DESCRIPTION_LENGTH,
 };

@@ -124,7 +124,7 @@ export default function ProposalFormPage() {
     }));
   }
 
-  function openAiWizard() {
+  function openAiWizard(mode = 'ai') {
     const selectedTemplate = templates.find((t) => t.id === form.templateId);
     navigate('/proposals/ai-wizard', {
       state: {
@@ -134,6 +134,7 @@ export default function ProposalFormPage() {
         clientName: form.clientName,
         templateId: selectedTemplate?.id || '',
         templateBody: selectedTemplate?.body || '',
+        mode,
       },
     });
   }
@@ -195,13 +196,20 @@ export default function ProposalFormPage() {
       {error ? <div className="alert alert-error">{error}</div> : null}
 
       <form className="form" onSubmit={handleSubmit}>
-        <div className="form-actions" style={{ marginBottom: 8 }}>
+        <div className="form-actions" style={{ marginBottom: 8, gap: 8, justifyContent: 'flex-start', flexWrap: 'wrap' }}>
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={openAiWizard}
+            onClick={() => openAiWizard('ai')}
           >
             Generate with AI
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => openAiWizard('fromTemplate')}
+          >
+            Generate with template
           </button>
         </div>
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { draftProposal, extractIssues, suggestSolutions } from '../../api/ai';
+import { draftProposal, draftProposalFromTemplate, extractIssues, suggestSolutions } from '../../api/ai';
 import { createAiDraft, titleFromJob } from '../../api/aiDrafts';
 import { listProjects } from '../../api/projects';
 import { listTemplates } from '../../api/templates';
@@ -11,7 +11,8 @@ import {
   labelFor,
 } from '../../constants/enums';
 
-const STEPS = ['Job', 'Issues', 'Solutions', 'Draft'];
+const AI_STEPS = ['Job', 'Issues', 'Solutions', 'Draft'];
+const TEMPLATE_STEPS = ['Job', 'Draft'];
 
 function matchingProjectIds(projects, domain) {
   return (projects || [])
@@ -36,6 +37,11 @@ export default function AiProposalWizardPage() {
   const incomingTemplateId =
     incoming.templateId || formSnapshot?.templateId || '';
   const clientName = incoming.clientName || formSnapshot?.clientName || '';
+  const [fromTemplate, setFromTemplate] = useState(
+    incoming.mode === 'fromTemplate',
+  );
+  const steps = fromTemplate ? TEMPLATE_STEPS : AI_STEPS;
+  const draftStep = fromTemplate ? 1 : 3;
 
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -77,7 +83,14 @@ export default function AiProposalWizardPage() {
         const items = projectList || [];
         setProjects(items);
         setSelectedProjectIds(new Set(matchingProjectIds(items, domain)));
-        setTemplates(templateList || []);
+        const list = templateList || [];
+        setTemplates(list);
+        if (fromTemplate) {
+          const exists = list.some((t) => t.id === incomingTemplateId);
+          if (!exists && list.length) {
+            setSelectedTemplateId(list[0].id);
+          }
+        }
       } catch (err) {
         if (!cancelled) setError(err.message || 'Failed to load projects');
       } finally {
@@ -94,6 +107,14 @@ export default function AiProposalWizardPage() {
   function changeDomain(nextDomain) {
     setDomain(nextDomain);
     setSelectedProjectIds(new Set(matchingProjectIds(projects, nextDomain)));
+  }
+
+  function setGenerationMode(nextFromTemplate) {
+    setFromTemplate(nextFromTemplate);
+    setError('');
+    if (nextFromTemplate && !selectedTemplateId && templates.length) {
+      setSelectedTemplateId(templates[0].id);
+    }
   }
 
   function toggleProject(id) {
@@ -132,6 +153,21 @@ export default function AiProposalWizardPage() {
   );
 
   const guidanceNotes = notes.trim() || undefined;
+
+  function selectedProjectPayload() {
+    return projects
+      .filter((p) => selectedProjectIds.has(p.id))
+      .map((p) => ({
+        name: p.name,
+        description: p.description || null,
+        types: p.types,
+        playStoreUrl: p.playStoreUrl,
+        appStoreUrl: p.appStoreUrl,
+        webUrl: p.webUrl,
+        describe: describeProjectIds.has(p.id),
+        mentionNote: (projectNotes[p.id] || '').trim() || null,
+      }));
+  }
 
   function addCustomIssue() {
     const title = newIssueTitle.trim();
@@ -229,8 +265,6 @@ export default function AiProposalWizardPage() {
     setBusy(true);
     setError('');
     try {
-      const selectedProjects = projects.filter((p) => selectedProjectIds.has(p.id));
-
       const result = await draftProposal({
         jobDescription: jobDescription.trim(),
         domain,
@@ -245,16 +279,7 @@ export default function AiProposalWizardPage() {
           issueTitle: s.issueTitle,
           offer: s.offer.trim(),
         })),
-        projects: selectedProjects.map((p) => ({
-          name: p.name,
-          description: p.description || null,
-          types: p.types,
-          playStoreUrl: p.playStoreUrl,
-          appStoreUrl: p.appStoreUrl,
-          webUrl: p.webUrl,
-          describe: describeProjectIds.has(p.id),
-          mentionNote: (projectNotes[p.id] || '').trim() || null,
-        })),
+        projects: selectedProjectPayload(),
         templateBody: selectedTemplate?.body?.trim() || undefined,
         inspiredFrom: selectedTemplate?.inspiredFrom?.trim() || undefined,
         clientName: clientName.trim() || undefined,
@@ -268,6 +293,43 @@ export default function AiProposalWizardPage() {
       }
       setDraftBody(body);
       setStep(3);
+    } catch (err) {
+      setError(err.message || 'Failed to generate draft');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runDraftFromTemplate() {
+    if (!jobDescription.trim()) {
+      setError('Paste a job description first.');
+      return;
+    }
+    const templateBody = selectedTemplate?.body?.trim();
+    if (!templateBody) {
+      setError('Select a template first.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const result = await draftProposalFromTemplate({
+        jobDescription: jobDescription.trim(),
+        domain,
+        language,
+        templateBody,
+        projects: selectedProjectPayload(),
+        inspiredFrom: selectedTemplate?.inspiredFrom?.trim() || undefined,
+        clientName: clientName.trim() || undefined,
+        notes: guidanceNotes,
+      });
+      const body = (result.body || '').trim();
+      if (!body) {
+        setError('Empty draft returned. Try again.');
+        return;
+      }
+      setDraftBody(body);
+      setStep(draftStep);
     } catch (err) {
       setError(err.message || 'Failed to generate draft');
     } finally {
@@ -332,14 +394,21 @@ export default function AiProposalWizardPage() {
   }
 
   function primaryAction() {
+    if (fromTemplate) {
+      if (step === 0) return runDraftFromTemplate();
+      return useDraft();
+    }
     if (step === 0) return runExtract();
     if (step === 1) return runSolutions();
     if (step === 2) return runDraft();
     return useDraft();
   }
 
-  const primaryLabel =
-    step === 0
+  const primaryLabel = fromTemplate
+    ? step === 0
+      ? 'Generate draft'
+      : 'Use draft'
+    : step === 0
       ? 'Extract issues'
       : step === 1
         ? 'Suggest solutions'
@@ -351,9 +420,11 @@ export default function AiProposalWizardPage() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Generate with AI</h1>
+          <h1>{fromTemplate ? 'Generate with template' : 'Generate with AI'}</h1>
           <p className="muted" style={{ margin: '4px 0 0' }}>
-            Issues → solutions → draft, same flow as the mobile app.
+            {fromTemplate
+              ? 'Fill a template skeleton from the job posting.'
+              : 'Issues → solutions → draft, same flow as the mobile app.'}
           </p>
         </div>
         <Link to={returnTo} className="btn btn-ghost" state={{ formSnapshot }}>
@@ -362,7 +433,7 @@ export default function AiProposalWizardPage() {
       </div>
 
       <div className="ai-steps" aria-label="Wizard progress">
-        {STEPS.map((label, index) => (
+        {steps.map((label, index) => (
           <div
             key={label}
             className={`ai-step ${index <= step ? 'active' : ''} ${index === step ? 'current' : ''}`}
@@ -377,6 +448,28 @@ export default function AiProposalWizardPage() {
 
       {step === 0 ? (
         <div className="form panel">
+          <div className="field">
+            <span>How to generate</span>
+            <div className="header-actions">
+              <button
+                type="button"
+                className={`btn ${fromTemplate ? 'btn-secondary' : 'btn-primary'}`}
+                onClick={() => setGenerationMode(false)}
+                disabled={busy}
+              >
+                Generate with AI
+              </button>
+              <button
+                type="button"
+                className={`btn ${fromTemplate ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setGenerationMode(true)}
+                disabled={busy}
+              >
+                Generate with template
+              </button>
+            </div>
+          </div>
+
           <label className="field">
             <span>Job description *</span>
             <textarea
@@ -510,13 +603,13 @@ export default function AiProposalWizardPage() {
           </label>
 
           <label className="field">
-            <span>Inspire from template</span>
+            <span>{fromTemplate ? 'Template *' : 'Inspire from template'}</span>
             <select
               value={selectedTemplateId}
               onChange={(e) => setSelectedTemplateId(e.target.value)}
               disabled={busy}
             >
-              <option value="">None</option>
+              {fromTemplate ? null : <option value="">None</option>}
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name} ({labelFor(PROPOSAL_PROJECT_TYPES, t.projectType)})
@@ -524,10 +617,15 @@ export default function AiProposalWizardPage() {
               ))}
             </select>
           </label>
+          {fromTemplate && templates.length === 0 ? (
+            <p className="muted">
+              Add a template first so it can be filled for this job.
+            </p>
+          ) : null}
         </div>
       ) : null}
 
-      {step === 1 ? (
+      {step === 1 && !fromTemplate ? (
         <div className="ai-cards">
           {issues.map((issue, index) => (
             <div key={issue.id || index} className="ai-card">
@@ -625,7 +723,7 @@ export default function AiProposalWizardPage() {
         </div>
       ) : null}
 
-      {step === 2 ? (
+      {step === 2 && !fromTemplate ? (
         <div className="ai-cards">
           {solutions.map((solution, index) => (
             <div key={solution.issueId || index} className="ai-card">
@@ -651,7 +749,7 @@ export default function AiProposalWizardPage() {
         </div>
       ) : null}
 
-      {step === 3 ? (
+      {step === draftStep ? (
         <div className="form panel">
           <p className="muted">
             Review and edit before applying to the proposal form.
@@ -686,7 +784,7 @@ export default function AiProposalWizardPage() {
           <span />
         )}
         <div style={{ display: 'flex', gap: 8 }}>
-          {step === 3 ? (
+          {step === draftStep ? (
             <button
               type="button"
               className="btn btn-secondary"

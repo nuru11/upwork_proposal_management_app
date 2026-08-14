@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../providers/providers.dart';
+import '../../shared/platform/ios_pwa_hint.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -130,6 +131,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             )
                           : const Text('Sign in'),
                     ),
+                    if (shouldShowIosPwaInstallHint) ...[
+                      const SizedBox(height: 24),
+                      Text(
+                        'On iPhone, tap Share → Add to Home Screen to install this app.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ],
                 ),
               ),

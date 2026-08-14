@@ -1,11 +1,10 @@
-<IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteBase /
+DirectoryIndex index.html
 
-  # Serve existing files and directories as-is
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
+RewriteEngine On
+RewriteBase /
 
-  # Fall back to index.html for client-side routes
-  RewriteRule ^ index.html [L]
-</IfModule>
+# Flutter PWA at /app/ has its own SPA fallback in /app/.htaccess.
+RewriteCond %{REQUEST_URI} !^/app/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]

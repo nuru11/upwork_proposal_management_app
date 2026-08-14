@@ -64,24 +64,7 @@ class AiApi {
       'language': language,
       'issues': issues.map((e) => e.toJson()).toList(),
       'solutions': solutions.map((e) => e.toJson()).toList(),
-      'projects': projects
-          .map(
-            (mention) {
-              final p = mention.project;
-              final note = mention.mentionNote?.trim();
-              return {
-                'name': p.name,
-                'description': p.description,
-                'types': p.types.map((t) => t.name).toList(),
-                'playStoreUrl': p.playStoreUrl,
-                'appStoreUrl': p.appStoreUrl,
-                'webUrl': p.webUrl,
-                'describe': mention.describe,
-                'mentionNote': (note != null && note.isNotEmpty) ? note : null,
-              };
-            },
-          )
-          .toList(),
+      'projects': _projectsPayload(projects),
       if (templateBody != null && templateBody.isNotEmpty)
         'templateBody': templateBody,
       if (inspiredFrom != null && inspiredFrom.isNotEmpty)
@@ -90,5 +73,46 @@ class AiApi {
       if (notes != null && notes.isNotEmpty) 'notes': notes,
     });
     return body['body']?.toString() ?? '';
+  }
+
+  Future<String> draftProposalFromTemplate({
+    required String jobDescription,
+    required String domain,
+    required String language,
+    required String templateBody,
+    required List<AiProjectMention> projects,
+    String? inspiredFrom,
+    String? clientName,
+    String? notes,
+  }) async {
+    final body = await _client.postJson('/api/ai/draft-proposal-from-template', {
+      'jobDescription': jobDescription,
+      'domain': domain,
+      'language': language,
+      'templateBody': templateBody,
+      'projects': _projectsPayload(projects),
+      if (inspiredFrom != null && inspiredFrom.isNotEmpty)
+        'inspiredFrom': inspiredFrom,
+      if (clientName != null && clientName.isNotEmpty) 'clientName': clientName,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+    });
+    return body['body']?.toString() ?? '';
+  }
+
+  List<Map<String, Object?>> _projectsPayload(List<AiProjectMention> projects) {
+    return projects.map((mention) {
+      final p = mention.project;
+      final note = mention.mentionNote?.trim();
+      return {
+        'name': p.name,
+        'description': p.description,
+        'types': p.types.map((t) => t.name).toList(),
+        'playStoreUrl': p.playStoreUrl,
+        'appStoreUrl': p.appStoreUrl,
+        'webUrl': p.webUrl,
+        'describe': mention.describe,
+        'mentionNote': (note != null && note.isNotEmpty) ? note : null,
+      };
+    }).toList();
   }
 }

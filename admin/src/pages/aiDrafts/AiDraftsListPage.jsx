@@ -55,17 +55,30 @@ export default function AiDraftsListPage() {
     <div className="page">
       <div className="page-header">
         <h1>AI drafts</h1>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() =>
-            navigate('/proposals/ai-wizard', {
-              state: { returnTo: '/ai-drafts' },
-            })
-          }
-        >
-          New AI draft
-        </button>
+        <div className="header-actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() =>
+              navigate('/proposals/ai-wizard', {
+                state: { returnTo: '/ai-drafts', mode: 'fromTemplate' },
+              })
+            }
+          >
+            Generate with template
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() =>
+              navigate('/proposals/ai-wizard', {
+                state: { returnTo: '/ai-drafts' },
+              })
+            }
+          >
+            New AI draft
+          </button>
+        </div>
       </div>
 
       {error ? <div className="alert alert-error">{error}</div> : null}
@@ -76,17 +89,30 @@ export default function AiDraftsListPage() {
           title="No AI drafts"
           message="Generate a proposal with AI and save it here."
           action={
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() =>
-                navigate('/proposals/ai-wizard', {
-                  state: { returnTo: '/ai-drafts' },
-                })
-              }
-            >
-              Generate with AI
-            </button>
+            <div className="header-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() =>
+                  navigate('/proposals/ai-wizard', {
+                    state: { returnTo: '/ai-drafts', mode: 'fromTemplate' },
+                  })
+                }
+              >
+                Generate with template
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() =>
+                  navigate('/proposals/ai-wizard', {
+                    state: { returnTo: '/ai-drafts' },
+                  })
+                }
+              >
+                Generate with AI
+              </button>
+            </div>
           }
         />
       ) : null}

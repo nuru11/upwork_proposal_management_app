@@ -8,5 +8,6 @@ router.use(authRequired);
 router.post('/extract-issues', aiController.extractIssues);
 router.post('/suggest-solutions', aiController.suggestSolutions);
 router.post('/draft-proposal', aiController.draftProposal);
+router.post('/draft-proposal-from-template', aiController.draftProposalFromTemplate);
 
 module.exports = router;
