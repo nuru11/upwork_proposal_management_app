@@ -34,16 +34,100 @@
 
   <title>Proposal Manager</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #0F766E;
+    }
+    #splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0F766E;
+      color: #fff;
+      font-family: -apple-system, system-ui, sans-serif;
+    }
+    #splash img {
+      width: 96px;
+      height: 96px;
+      border-radius: 20px;
+    }
+    #splash .spinner {
+      margin-top: 24px;
+      width: 28px;
+      height: 28px;
+      border: 3px solid rgba(255, 255, 255, 0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    #splash-reload {
+      display: none;
+      margin-top: 20px;
+      text-align: center;
+    }
+    #splash-reload button {
+      margin-top: 8px;
+      background: #fff;
+      color: #0F766E;
+      border: 0;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
-  <script src="flutter_bootstrap.js" async></script>
+  <div id="splash">
+    <img src="icons/Icon-192.png" alt="Proposal Manager">
+    <div class="spinner"></div>
+    <div id="splash-reload">
+      <div>Still loading...</div>
+      <button type="button" onclick="location.reload()">Reload</button>
+    </div>
+  </div>
+  <script>
+    (function () {
+      function loadFlutter() {
+        var script = document.createElement('script');
+        script.src = 'flutter_bootstrap.js';
+        script.async = true;
+        document.body.appendChild(script);
+      }
+      function ready() {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations()
+            .then(function (regs) {
+              return Promise.all(regs.map(function (reg) { return reg.unregister(); }));
+            })
+            .catch(function () {})
+            .then(loadFlutter);
+        } else {
+          loadFlutter();
+        }
+      }
+      ready();
+      setTimeout(function () {
+        var reload = document.getElementById('splash-reload');
+        if (reload) reload.style.display = 'block';
+      }, 20000);
+      var splashObserver = new MutationObserver(function () {
+        if (document.querySelector('flt-glass-pane') || document.querySelector('flutter-view')) {
+          var splash = document.getElementById('splash');
+          if (splash) splash.remove();
+          splashObserver.disconnect();
+        }
+      });
+      splashObserver.observe(document.body, { childList: true, subtree: true });
+    })();
+  </script>
 </body>
 </html>

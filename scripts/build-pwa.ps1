@@ -24,7 +24,7 @@ try {
 Write-Host "Building Flutter web PWA..."
 Push-Location $mobileDir
 try {
-    flutter build web --release --pwa-strategy=offline-first --base-href /app/ --dart-define=API_BASE_URL=$apiBaseUrl
+    flutter build web --release --pwa-strategy=none --base-href /app/ --dart-define=API_BASE_URL=$apiBaseUrl
 } finally {
     Pop-Location
 }
