@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { draftProposal, draftProposalFromTemplate, extractIssues, suggestSolutions } from '../../api/ai';
+import { draftProposal, extractIssues, fillTemplateFields, suggestSolutions } from '../../api/ai';
+import InlineTemplatePreview from '../../components/InlineTemplatePreview';
+import {
+  applyPlaceholders,
+  extractPlaceholders,
+  isClientNamePlaceholder,
+} from '../../utils/templatePlaceholders';
 import { createAiDraft, titleFromJob } from '../../api/aiDrafts';
 import { listProjects } from '../../api/projects';
 import { listTemplates } from '../../api/templates';
@@ -65,11 +71,38 @@ export default function AiProposalWizardPage() {
   const [describeProjectIds, setDescribeProjectIds] = useState(() => new Set());
   const [projectNotes, setProjectNotes] = useState({});
   const [projectsLoading, setProjectsLoading] = useState(true);
+  const [fieldValues, setFieldValues] = useState({});
+  const [fieldModes, setFieldModes] = useState({});
+  const [fieldBusyKey, setFieldBusyKey] = useState(null);
 
   const selectedTemplate = useMemo(
     () => templates.find((t) => t.id === selectedTemplateId) || null,
     [templates, selectedTemplateId],
   );
+
+  const templateKeys = useMemo(
+    () => extractPlaceholders(selectedTemplate?.body || ''),
+    [selectedTemplate],
+  );
+
+  useEffect(() => {
+    if (!fromTemplate) {
+      setFieldValues({});
+      setFieldModes({});
+      return;
+    }
+    const next = {};
+    const modes = {};
+    for (const key of templateKeys) {
+      next[key] =
+        isClientNamePlaceholder(key) && clientName.trim()
+          ? clientName.trim()
+          : '';
+      modes[key] = 'absolute';
+    }
+    setFieldValues(next);
+    setFieldModes(modes);
+  }, [fromTemplate, selectedTemplateId, templateKeys, clientName]);
 
   useEffect(() => {
     let cancelled = false;
@@ -300,41 +333,148 @@ export default function AiProposalWizardPage() {
     }
   }
 
-  async function runDraftFromTemplate() {
-    if (!jobDescription.trim()) {
-      setError('Paste a job description first.');
-      return;
+  function isNote(key) {
+    return fieldModes[key] === 'note';
+  }
+
+  const keysNeedingAi = templateKeys.filter((key) => {
+    const value = String(fieldValues[key] || '').trim();
+    return !value || isNote(key);
+  });
+
+  function splitFieldPayload(onlyKeys) {
+    const targets = onlyKeys || templateKeys;
+    const filled = {};
+    const emptyKeys = [];
+    const instructions = {};
+    for (const key of templateKeys) {
+      const value = String(fieldValues[key] || '').trim();
+      const targeted = targets.includes(key);
+      if (!targeted) {
+        if (!isNote(key) && value) filled[key] = value;
+        continue;
+      }
+      if (isNote(key) && value) {
+        emptyKeys.push(key);
+        instructions[key] = value;
+      } else if (!value) {
+        emptyKeys.push(key);
+      } else {
+        filled[key] = value;
+      }
     }
+    return { filled, emptyKeys, instructions };
+  }
+
+  function toggleFieldMode(key) {
+    setFieldModes((current) => ({
+      ...current,
+      [key]: current[key] === 'note' ? 'absolute' : 'note',
+    }));
+  }
+
+  async function fillFieldKeys(targetKeys) {
+    const split = splitFieldPayload(targetKeys);
+    if (!split.emptyKeys.length) return;
     const templateBody = selectedTemplate?.body?.trim();
     if (!templateBody) {
       setError('Select a template first.');
       return;
     }
+    const job = jobDescription.trim();
+    if (!job) {
+      setError('Paste a job description to fill with AI.');
+      return;
+    }
     setBusy(true);
+    setFieldBusyKey(split.emptyKeys.length === 1 ? split.emptyKeys[0] : null);
     setError('');
     try {
-      const result = await draftProposalFromTemplate({
-        jobDescription: jobDescription.trim(),
+      const result = await fillTemplateFields({
+        jobDescription: job,
         domain,
         language,
         templateBody,
+        filled: split.filled,
+        emptyKeys: split.emptyKeys,
+        instructions: split.instructions,
         projects: selectedProjectPayload(),
-        inspiredFrom: selectedTemplate?.inspiredFrom?.trim() || undefined,
         clientName: clientName.trim() || undefined,
         notes: guidanceNotes,
       });
-      const body = (result.body || '').trim();
-      if (!body) {
-        setError('Empty draft returned. Try again.');
-        return;
-      }
-      setDraftBody(body);
-      setStep(draftStep);
+      const next = result?.values || {};
+      setFieldValues((current) => {
+        const merged = { ...current };
+        for (const key of split.emptyKeys) {
+          const val = String(next[key] || '').trim();
+          if (val) merged[key] = val;
+        }
+        return merged;
+      });
+      setFieldModes((current) => {
+        const merged = { ...current };
+        for (const key of split.emptyKeys) {
+          if (String(next[key] || '').trim()) merged[key] = 'absolute';
+        }
+        return merged;
+      });
     } catch (err) {
-      setError(err.message || 'Failed to generate draft');
+      setError(err.message || 'Could not fill fields');
     } finally {
       setBusy(false);
+      setFieldBusyKey(null);
     }
+  }
+
+  async function runDraftFromTemplate() {
+    const templateBody = selectedTemplate?.body?.trim();
+    if (!templateBody) {
+      setError('Select a template first.');
+      return;
+    }
+    let values = { ...fieldValues };
+    const split = splitFieldPayload();
+    const job = jobDescription.trim();
+    if (split.emptyKeys.length && job) {
+      setBusy(true);
+      setFieldBusyKey(null);
+      setError('');
+      try {
+        const result = await fillTemplateFields({
+          jobDescription: job,
+          domain,
+          language,
+          templateBody,
+          filled: split.filled,
+          emptyKeys: split.emptyKeys,
+          instructions: split.instructions,
+          projects: selectedProjectPayload(),
+          clientName: clientName.trim() || undefined,
+          notes: guidanceNotes,
+        });
+        const next = result?.values || {};
+        values = { ...values };
+        const modes = { ...fieldModes };
+        for (const key of split.emptyKeys) {
+          const val = String(next[key] || '').trim();
+          if (val) {
+            values[key] = val;
+            modes[key] = 'absolute';
+          }
+        }
+        setFieldValues(values);
+        setFieldModes(modes);
+      } catch (err) {
+        setError(err.message || 'Could not fill fields');
+        setBusy(false);
+        return;
+      }
+    }
+    setDraftBody(applyPlaceholders(templateBody, values));
+    setStep(draftStep);
+    setBusy(false);
+    setFieldBusyKey(null);
+    setError('');
   }
 
   function useDraft() {
@@ -621,6 +761,41 @@ export default function AiProposalWizardPage() {
             <p className="muted">
               Add a template first so it can be filled for this job.
             </p>
+          ) : null}
+
+          {fromTemplate && selectedTemplate?.body && templateKeys.length > 0 ? (
+            <div className="field">
+              <span>Fill the highlighted fields</span>
+              <p className="muted" style={{ margin: '0 0 8px' }}>
+                Abs = use as-is. Note = instruction for AI. Tap the label to switch.
+              </p>
+              <div className="form-actions" style={{ justifyContent: 'flex-start', marginBottom: 10 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => fillFieldKeys(keysNeedingAi)}
+                  disabled={busy || keysNeedingAi.length === 0}
+                >
+                  {busy && !fieldBusyKey
+                    ? 'Filling…'
+                    : keysNeedingAi.length === 0
+                      ? 'All fields filled'
+                      : `Fill empty with AI (${keysNeedingAi.length})`}
+                </button>
+              </div>
+              <InlineTemplatePreview
+                body={selectedTemplate.body}
+                values={fieldValues}
+                modes={fieldModes}
+                onChange={(key, value) =>
+                  setFieldValues((current) => ({ ...current, [key]: value }))
+                }
+                onFillField={(token) => fillFieldKeys([token])}
+                onToggleMode={toggleFieldMode}
+                busy={busy}
+                busyKey={fieldBusyKey}
+              />
+            </div>
           ) : null}
         </div>
       ) : null}

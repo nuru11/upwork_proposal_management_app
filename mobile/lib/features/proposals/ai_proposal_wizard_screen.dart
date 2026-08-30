@@ -10,7 +10,9 @@ import '../../data/models/proposal.dart';
 import '../../data/models/template.dart';
 import '../../data/remote/api_client.dart';
 import '../../providers/providers.dart';
+import '../../shared/template_placeholders.dart';
 import '../../shared/theme/app_theme.dart';
+import 'inline_template_preview.dart' show FieldFillMode, InlineTemplatePreview;
 
 class AiProposalWizardScreen extends ConsumerStatefulWidget {
   const AiProposalWizardScreen({super.key, this.args});
@@ -50,6 +52,11 @@ class _AiProposalWizardScreenState
   final Map<String, TextEditingController> _projectNoteControllers = {};
   bool _projectsLoading = true;
 
+  final Map<String, TextEditingController> _fieldControllers = {};
+  final Map<String, FieldFillMode> _fieldModes = {};
+  String? _fieldTemplateId;
+  String? _fieldBusyKey;
+
   @override
   void initState() {
     super.initState();
@@ -79,6 +86,7 @@ class _AiProposalWizardScreenState
           _templates.isNotEmpty) {
         _selectedTemplateId = _templates.first.id;
       }
+      _syncFieldControllers();
     });
   }
 
@@ -95,6 +103,7 @@ class _AiProposalWizardScreenState
               ? list.first.id
               : null;
         }
+        _syncFieldControllers();
       });
     } catch (e) {
       if (!mounted) return;
@@ -200,7 +209,82 @@ class _AiProposalWizardScreenState
     for (final c in _projectNoteControllers.values) {
       c.dispose();
     }
+    for (final c in _fieldControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  void _syncFieldControllers() {
+    final body = _fromTemplate ? (_templateBody ?? '') : '';
+    final keys = extractPlaceholders(body);
+    final templateId = _fromTemplate ? _selectedTemplateId : null;
+    final sameKeys = keys.length == _fieldControllers.length &&
+        keys.every(_fieldControllers.containsKey);
+    if (templateId == _fieldTemplateId && sameKeys) return;
+
+    for (final controller in _fieldControllers.values) {
+      controller.dispose();
+    }
+    _fieldControllers.clear();
+    _fieldModes.clear();
+    final client = widget.args?.clientName?.trim() ?? '';
+    for (final key in keys) {
+      final initial =
+          isClientNamePlaceholder(key) && client.isNotEmpty ? client : '';
+      _fieldControllers[key] = TextEditingController(text: initial);
+      _fieldModes[key] = FieldFillMode.absolute;
+    }
+    _fieldTemplateId = templateId;
+  }
+
+  Map<String, String> get _fieldValues => {
+        for (final entry in _fieldControllers.entries)
+          entry.key: entry.value.text.trim(),
+      };
+
+  bool _isNote(String key) => _fieldModes[key] == FieldFillMode.note;
+
+  List<String> get _keysNeedingAi => _fieldControllers.keys.where((key) {
+        final value = _fieldValues[key] ?? '';
+        return value.isEmpty || _isNote(key);
+      }).toList();
+
+  void _toggleFieldMode(String key) {
+    setState(() {
+      _fieldModes[key] = _isNote(key)
+          ? FieldFillMode.absolute
+          : FieldFillMode.note;
+    });
+  }
+
+  ({
+    Map<String, String> filled,
+    List<String> emptyKeys,
+    Map<String, String> instructions,
+  }) _splitFieldPayload({List<String>? onlyKeys}) {
+    final targets = onlyKeys ?? _fieldControllers.keys.toList();
+    final filled = <String, String>{};
+    final emptyKeys = <String>[];
+    final instructions = <String, String>{};
+
+    for (final key in _fieldControllers.keys) {
+      final value = _fieldValues[key] ?? '';
+      final targeted = targets.contains(key);
+      if (!targeted) {
+        if (!_isNote(key) && value.isNotEmpty) filled[key] = value;
+        continue;
+      }
+      if (_isNote(key) && value.isNotEmpty) {
+        emptyKeys.add(key);
+        instructions[key] = value;
+      } else if (value.isEmpty) {
+        emptyKeys.add(key);
+      } else {
+        filled[key] = value;
+      }
+    }
+    return (filled: filled, emptyKeys: emptyKeys, instructions: instructions);
   }
 
   String? get _templateBody {
@@ -432,54 +516,118 @@ class _AiProposalWizardScreenState
     }
   }
 
-  Future<void> _draftFromTemplate() async {
-    final job = _jobController.text.trim();
-    if (job.isEmpty) {
-      setState(() => _error = 'Paste a job description first.');
+  Future<void> _fillFieldKeys(List<String> targetKeys) async {
+    final split = _splitFieldPayload(onlyKeys: targetKeys);
+    if (split.emptyKeys.isEmpty) return;
+    final templateBody = _templateBody;
+    if (templateBody == null) {
+      setState(() => _error = 'Select a template first.');
       return;
     }
+    final job = _jobController.text.trim();
+    if (job.isEmpty) {
+      setState(() => _error = 'Paste a job description to fill with AI.');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _fieldBusyKey =
+          split.emptyKeys.length == 1 ? split.emptyKeys.first : null;
+      _error = null;
+    });
+
+    try {
+      final values = await ref.read(aiApiProvider).fillTemplateFields(
+            jobDescription: job,
+            domain: _domain.name,
+            language: _language.name,
+            templateBody: templateBody,
+            filled: split.filled,
+            emptyKeys: split.emptyKeys,
+            instructions: split.instructions,
+            projects: _selectedProjectMentions(),
+            clientName: widget.args?.clientName,
+            notes: _guidanceNotes,
+          );
+      if (!mounted) return;
+      values.forEach((key, value) {
+        final controller = _fieldControllers[key];
+        if (controller != null && value.trim().isNotEmpty) {
+          controller.text = value.trim();
+          _fieldModes[key] = FieldFillMode.absolute;
+        }
+      });
+      setState(() {
+        _loading = false;
+        _fieldBusyKey = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _fieldBusyKey = null;
+        _error = _friendlyError(e);
+      });
+    }
+  }
+
+  Future<void> _draftFromTemplate() async {
     final templateBody = _templateBody;
     if (templateBody == null) {
       setState(() => _error = 'Select a template first.');
       return;
     }
 
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    _syncFieldControllers();
+    var values = Map<String, String>.from(_fieldValues);
+    final split = _splitFieldPayload();
+    final job = _jobController.text.trim();
 
-    try {
-      final body = await ref.read(aiApiProvider).draftProposalFromTemplate(
-            jobDescription: job,
-            domain: _domain.name,
-            language: _language.name,
-            templateBody: templateBody,
-            projects: _selectedProjectMentions(),
-            inspiredFrom: _inspiredFrom,
-            clientName: widget.args?.clientName,
-            notes: _guidanceNotes,
-          );
-      if (!mounted) return;
-      if (body.trim().isEmpty) {
+    if (split.emptyKeys.isNotEmpty && job.isNotEmpty) {
+      setState(() {
+        _loading = true;
+        _fieldBusyKey = null;
+        _error = null;
+      });
+      try {
+        final aiValues = await ref.read(aiApiProvider).fillTemplateFields(
+              jobDescription: job,
+              domain: _domain.name,
+              language: _language.name,
+              templateBody: templateBody,
+              filled: split.filled,
+              emptyKeys: split.emptyKeys,
+              instructions: split.instructions,
+              projects: _selectedProjectMentions(),
+              clientName: widget.args?.clientName,
+              notes: _guidanceNotes,
+            );
+        if (!mounted) return;
+        aiValues.forEach((key, value) {
+          final trimmed = value.trim();
+          if (trimmed.isEmpty) return;
+          values[key] = trimmed;
+          _fieldControllers[key]?.text = trimmed;
+          _fieldModes[key] = FieldFillMode.absolute;
+        });
+      } catch (e) {
+        if (!mounted) return;
         setState(() {
           _loading = false;
-          _error = 'Empty draft returned. Try again.';
+          _error = _friendlyError(e);
         });
         return;
       }
-      _draftController.text = body;
-      setState(() {
-        _step = _draftStep;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = _friendlyError(e);
-      });
     }
+
+    _draftController.text = applyPlaceholders(templateBody, values);
+    setState(() {
+      _step = _draftStep;
+      _loading = false;
+      _fieldBusyKey = null;
+      _error = null;
+    });
   }
 
   String _friendlyError(Object e) {
@@ -902,9 +1050,57 @@ class _AiProposalWizardScreenState
               ),
             ],
             onChanged: (value) {
-              setState(() => _selectedTemplateId = value);
+              setState(() {
+                _selectedTemplateId = value;
+                _syncFieldControllers();
+              });
             },
           ),
+        if (_fromTemplate &&
+            _templateBody != null &&
+            _fieldControllers.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text(
+            'Fill the highlighted fields',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Abs = use as-is. Note = instruction for AI. Tap the label to switch.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.slate500,
+                ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _loading || _keysNeedingAi.isEmpty
+                ? null
+                : () => _fillFieldKeys(_keysNeedingAi),
+            icon: _loading && _fieldBusyKey == null
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.auto_awesome_outlined),
+            label: Text(
+              _keysNeedingAi.isEmpty
+                  ? 'All fields filled'
+                  : 'Fill empty with AI (${_keysNeedingAi.length})',
+            ),
+          ),
+          const SizedBox(height: 12),
+          InlineTemplatePreview(
+            body: _templateBody!,
+            controllers: _fieldControllers,
+            modes: _fieldModes,
+            enabled: !_loading,
+            busyKey: _fieldBusyKey,
+            onFillField: (token) => _fillFieldKeys([token]),
+            onToggleMode: _toggleFieldMode,
+            onChanged: () => setState(() {}),
+          ),
+        ],
       ],
     );
   }

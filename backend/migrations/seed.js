@@ -4,6 +4,27 @@ const bcrypt = require('bcryptjs');
 const mysql = require('mysql2/promise');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
+async function upsertTemplate(connection, {
+  id, userId, name, body, inspiredFrom, language = 'english', now,
+}) {
+  await connection.execute(
+    `INSERT INTO templates (
+      id, user_id, name, body, inspired_from, language, project_type, is_favorite,
+      created_at, updated_at, deleted_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL)
+    ON DUPLICATE KEY UPDATE
+      name = VALUES(name),
+      body = VALUES(body),
+      inspired_from = VALUES(inspired_from),
+      language = VALUES(language),
+      project_type = VALUES(project_type),
+      is_favorite = VALUES(is_favorite),
+      updated_at = VALUES(updated_at),
+      deleted_at = NULL`,
+    [id, userId, name, body, inspiredFrom, language, 'mobileApp', now, now],
+  );
+}
+
 async function seed() {
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST,
@@ -81,33 +102,118 @@ Happy to jump on a quick chat.
 
 Best,`;
 
-    await connection.execute(
-      `INSERT INTO templates (
-        id, user_id, name, body, inspired_from, language, project_type, is_favorite,
-        created_at, updated_at, deleted_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL)
-      ON DUPLICATE KEY UPDATE
-        name = VALUES(name),
-        body = VALUES(body),
-        inspired_from = VALUES(inspired_from),
-        language = VALUES(language),
-        project_type = VALUES(project_type),
-        is_favorite = VALUES(is_favorite),
-        updated_at = VALUES(updated_at),
-        deleted_at = NULL`,
-      [
-        templateId,
-        userId,
-        'UX + technical bottleneck',
-        templateBody,
-        inspiredFrom,
-        'english',
-        'mobileApp',
-        now,
-        now,
-      ],
-    );
+    await upsertTemplate(connection, {
+      id: templateId,
+      userId,
+      name: 'UX + technical bottleneck',
+      body: templateBody,
+      inspiredFrom,
+      language: 'english',
+      now,
+    });
     console.log('Upserted template "UX + technical bottleneck".');
+
+    const proofFirstId = '3e9a1c4b-7d2f-4e8a-9b1c-5f6d8e0a2c4b';
+    const proofFirstBody = `Hi [Client Name / "there"],
+
+I've helped [X] [App / startup type] [Measurable Result] using [Similar Approach].
+
+[Specific Proof From a Similar Build]. You can see that app here: [Link to Similar Project].
+
+Your main challenge looks like [Core Job Challenge]. Here's my 3-step plan:
+1. [Step 1 — first-week UX / first-open action]
+2. [Step 2 — the reliability piece that usually breaks after launch]
+3. [Step 3 — store-ready build so review doesn't stall you]
+
+[Likely Objection] — [Short answer in plain talk].
+
+Quick win you can do right now: [One change they can make on the current flow or listing today].
+
+[Expert Question that baselines the work]
+
+I'm free for a 10-minute call today to walk through [Their Goal].
+Best,`;
+    const proofFirstInspired = `Hi,
+
+I've helped 2 on-demand startups get users booking in 2 taps using the same dual-app setup (customers + drivers).
+
+On one of those apps, live tracking kept updating when a driver's signal dropped. You can see that build here: [Insert Link].
+
+Your main challenge looks like people leaving because booking takes too many taps or the map lags. Here's my 3-step plan:
+1. First-open screen is one action — book or request — with a clear price.
+2. Background tracking that stays connected when the driver switches apps or hits a weak network.
+3. Store-ready build so review doesn't stall you after the app works on a device.
+
+You might be thinking of hiring two native teams — one Flutter codebase ships both stores and stays cheaper to change later.
+
+Quick win you can do right now: if booking is more than two steps, cut it to one screen with the price visible. That's where most of these apps lose people.
+
+Have you already mapped the first-open path — book in a few taps vs show a clear price first? That gives us a baseline before we change the flow.
+
+I'm free for a 10-minute call today to walk through week one.
+Best,`;
+
+    await upsertTemplate(connection, {
+      id: proofFirstId,
+      userId,
+      name: 'Proof-first 5-section',
+      body: proofFirstBody,
+      inspiredFrom: proofFirstInspired,
+      language: 'english',
+      now,
+    });
+    console.log('Upserted template "Proof-first 5-section".');
+
+    const proofFirstArId = '8f2b4d6a-1c3e-4f7b-9a0d-2e5c7b1d4f6a';
+    const proofFirstArBody = `مرحبا [Client Name / ""],
+
+ساعدت [X] [App / startup type] يحقّقون [Measurable Result] باستخدام [Similar Approach].
+
+[Specific Proof From a Similar Build]. تقدر تشوف التطبيق هنا: [Link to Similar Project].
+
+أكبر تحدي عندك يبدو [Core Job Challenge]. هذي خطتي من ٣ خطوات:
+1. [Step 1 — first-week UX / first-open action]
+2. [Step 2 — the reliability piece that usually breaks after launch]
+3. [Step 3 — store-ready build so review doesn't stall you]
+
+[Likely Objection] — [Short answer in plain talk].
+
+خطوة سريعة تقدر تعملها الحين: [One change they can make on the current flow or listing today].
+
+[Expert Question that baselines the work]
+
+أقدر أتفرّغ لمكالمة ١٠ دقايق اليوم ونمشي [Their Goal].
+مع التحية،`;
+    const proofFirstArInspired = `مرحبا،
+
+ساعدت ٢ من أصحاب تطبيقات الطلبات يحقّقون حجز بلمستين باستخدام نفس نظام التطبيقين (عملاء + سائقين).
+
+في واحد من هالتطبيقات، التتبع المباشر كمّل تحديث حتى لو إشارة السائق ضعفت. تقدر تشوف التطبيق هنا: [Insert Link].
+
+أكبر تحدي عندك يبدو إن الناس تطلع لأن الحجز يحتاج لمسات كثيرة أو الخريطة تتقطع. هذي خطتي من ٣ خطوات:
+1. أول شاشة تكون حركة واحدة — احجز أو اطلب — والسعر واضح.
+2. تتبع في الخلفية يفضل متصل حتى لو السائق بدّل التطبيق أو الشبكة ضعفت.
+3. نسخة جاهزة للمتاجر عشان المراجعة ما تعطّلك بعد ما التطبيق يشتغل على الجهاز.
+
+ممكن تكون تفكر توظّف فريقين أصليين — كود Flutter واحد ينزل على المتجرين ويبقى أرخص لو تغيّر شيء لاحقاً.
+
+خطوة سريعة تقدر تعملها الحين: إذا الحجز أكثر من خطوتين، خلّه شاشة واحدة والسعر ظاهر. هنا أغلب هالتطبيقات تخسر الناس.
+
+هل رسمت مسار أول فتح — حجز بلمسات قليلة ولا سعر واضح أولاً؟ هذا يعطينا خط أساس قبل ما نغيّر التدفق.
+
+أقدر أتفرّغ لمكالمة ١٠ دقايق اليوم ونمشي أسبوع الشغل الأول.
+مع التحية،`;
+
+    await upsertTemplate(connection, {
+      id: proofFirstArId,
+      userId,
+      name: 'Proof-first 5-section (AR)',
+      body: proofFirstArBody,
+      inspiredFrom: proofFirstArInspired,
+      language: 'arabic',
+      now,
+    });
+    console.log('Upserted template "Proof-first 5-section (AR)".');
   } finally {
     await connection.end();
   }

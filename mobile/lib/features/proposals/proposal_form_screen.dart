@@ -8,7 +8,9 @@ import '../../data/models/ai_proposal.dart';
 import '../../data/models/proposal.dart';
 import '../../data/models/template.dart';
 import '../../providers/providers.dart';
+import '../../shared/template_placeholders.dart';
 import '../../shared/theme/app_theme.dart';
+import 'template_fill_sheet.dart';
 
 class ProposalFormScreen extends ConsumerStatefulWidget {
   const ProposalFormScreen({super.key, this.proposalId, this.prefill});
@@ -148,14 +150,51 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
 
     if (selected == null || !mounted) return;
 
+    final keys = extractPlaceholders(selected.body);
+    var body = selected.body;
+    if (keys.isNotEmpty) {
+      final filled = await showTemplateFillSheet(
+        context: context,
+        templateBody: selected.body,
+        language: selected.language.name,
+        clientName: _clientController.text.trim().isEmpty
+            ? null
+            : _clientController.text.trim(),
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
+      );
+      if (!mounted) return;
+      if (filled == null) return;
+      body = filled;
+    }
+
     setState(() {
-      _bodyController.text = selected.body;
+      _bodyController.text = body;
       _language = selected.language;
       _projectType = selected.projectType;
       _templateId = selected.id;
       _templateName = selected.name;
       _templateBody = selected.body;
     });
+  }
+
+  Future<void> _refillTemplateFields() async {
+    final templateBody = _templateBody;
+    if (templateBody == null || !mounted) return;
+    final filled = await showTemplateFillSheet(
+      context: context,
+      templateBody: templateBody,
+      language: _language.name,
+      clientName: _clientController.text.trim().isEmpty
+          ? null
+          : _clientController.text.trim(),
+      notes: _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim(),
+    );
+    if (filled == null || !mounted) return;
+    setState(() => _bodyController.text = filled);
   }
 
   Future<void> _openAiWizard({
@@ -301,6 +340,15 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
                     : 'Template: $_templateName',
               ),
             ),
+            if (_templateBody != null &&
+                extractPlaceholders(_templateBody!).isNotEmpty) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _refillTemplateFields,
+                icon: const Icon(Icons.edit_note_outlined),
+                label: const Text('Fill fields'),
+              ),
+            ],
             const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: _openAiWizard,

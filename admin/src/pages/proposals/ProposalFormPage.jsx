@@ -12,6 +12,8 @@ import {
   LANGUAGES,
   PROPOSAL_PROJECT_TYPES,
 } from '../../constants/enums';
+import TemplateFillModal from '../../components/TemplateFillModal';
+import { extractPlaceholders } from '../../utils/templatePlaceholders';
 
 const blank = {
   title: '',
@@ -48,6 +50,7 @@ export default function ProposalFormPage() {
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [fillOpen, setFillOpen] = useState(false);
 
   useEffect(() => {
     if (!location.state?.formSnapshot && !location.state?.aiBody) return;
@@ -115,13 +118,34 @@ export default function ProposalFormPage() {
     if (!templateId) return;
     const tpl = templates.find((t) => t.id === templateId);
     if (!tpl) return;
+    const keys = extractPlaceholders(tpl.body || '');
     setForm((f) => ({
       ...f,
       templateId,
-      body: f.body.trim() ? f.body : tpl.body,
       language: tpl.language || f.language,
       projectType: tpl.projectType || f.projectType,
+      body: f.body.trim() ? f.body : keys.length === 0 ? tpl.body : f.body,
     }));
+  }
+
+  function openFillFields() {
+    const tpl = templates.find((t) => t.id === form.templateId);
+    if (!tpl) {
+      setError('Select a template first.');
+      return;
+    }
+    const keys = extractPlaceholders(tpl.body || '');
+    if (keys.length === 0) {
+      setForm((f) => ({
+        ...f,
+        body: f.body.trim() ? f.body : tpl.body,
+        language: tpl.language || f.language,
+        projectType: tpl.projectType || f.projectType,
+      }));
+      return;
+    }
+    setError('');
+    setFillOpen(true);
   }
 
   function openAiWizard(mode = 'ai') {
@@ -286,18 +310,28 @@ export default function ProposalFormPage() {
 
         <label className="field">
           <span>Template</span>
-          <select
-            value={form.templateId}
-            onChange={(e) => onTemplateChange(e.target.value)}
-          >
-            <option value="">None</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.isFavorite ? '★ ' : ''}
-                {t.name}
-              </option>
-            ))}
-          </select>
+          <div className="template-fill-row">
+            <select
+              value={form.templateId}
+              onChange={(e) => onTemplateChange(e.target.value)}
+            >
+              <option value="">None</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.isFavorite ? '★ ' : ''}
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={openFillFields}
+              disabled={!form.templateId}
+            >
+              Fill fields
+            </button>
+          </div>
         </label>
 
         <label className="field">
@@ -325,6 +359,25 @@ export default function ProposalFormPage() {
           </button>
         </div>
       </form>
+
+      <TemplateFillModal
+        open={fillOpen}
+        templateBody={templates.find((t) => t.id === form.templateId)?.body || ''}
+        language={form.language}
+        clientName={form.clientName}
+        notes={form.notes}
+        onCancel={() => setFillOpen(false)}
+        onApply={(body) => {
+          const tpl = templates.find((t) => t.id === form.templateId);
+          setForm((f) => ({
+            ...f,
+            body,
+            language: tpl?.language || f.language,
+            projectType: tpl?.projectType || f.projectType,
+          }));
+          setFillOpen(false);
+        }}
+      />
     </div>
   );
 }

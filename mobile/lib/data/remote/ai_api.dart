@@ -99,6 +99,35 @@ class AiApi {
     return body['body']?.toString() ?? '';
   }
 
+  Future<Map<String, String>> fillTemplateFields({
+    required String jobDescription,
+    required String language,
+    required String templateBody,
+    required Map<String, String> filled,
+    required List<String> emptyKeys,
+    Map<String, String> instructions = const {},
+    String domain = 'other',
+    List<AiProjectMention> projects = const [],
+    String? clientName,
+    String? notes,
+  }) async {
+    final body = await _client.postJson('/api/ai/fill-template-fields', {
+      'jobDescription': jobDescription,
+      'domain': domain,
+      'language': language,
+      'templateBody': templateBody,
+      'filled': filled,
+      'emptyKeys': emptyKeys,
+      if (instructions.isNotEmpty) 'instructions': instructions,
+      if (projects.isNotEmpty) 'projects': _projectsPayload(projects),
+      if (clientName != null && clientName.isNotEmpty) 'clientName': clientName,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+    });
+    final raw = body['values'];
+    if (raw is! Map) return {};
+    return raw.map((key, value) => MapEntry(key.toString(), value.toString()));
+  }
+
   List<Map<String, Object?>> _projectsPayload(List<AiProjectMention> projects) {
     return projects.map((mention) {
       final p = mention.project;

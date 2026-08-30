@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const express = require('express');
 const cors = require('cors');
@@ -20,5 +21,8 @@ app.use((err, _req, res, _next) => {
 });
 
 app.listen(port, () => {
-  console.log(`API listening on http://0.0.0.0:${port}`);
+  const aiReady = Boolean(process.env.GEMINI_API_KEY);
+  console.log(
+    `API listening on http://0.0.0.0:${port} (AI ${aiReady ? 'configured' : 'not configured'})`,
+  );
 });

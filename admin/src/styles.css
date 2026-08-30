@@ -8,6 +8,8 @@
   --cream: #f7f8fa;
   --teal: #0f766e;
   --teal-soft: #ccfbf1;
+  --amber: #b45309;
+  --amber-soft: #fef3c7;
   --rose: #be123c;
   --white: #ffffff;
   --shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
@@ -655,6 +657,94 @@ fieldset.field {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.modal.modal-wide {
+  max-width: 640px;
+  max-height: min(90vh, 860px);
+  overflow: auto;
+}
+
+.template-fill-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.template-fill-row select {
+  flex: 1;
+}
+
+.template-fill-fields {
+  max-height: 46vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.template-fill-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.btn-inline {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.inline-template {
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius);
+  background: var(--white);
+  padding: 12px 14px;
+}
+
+.inline-template-line {
+  margin: 0 0 10px;
+  line-height: 2;
+}
+
+.inline-template-line:last-child {
+  margin-bottom: 0;
+}
+
+.inline-template-field {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin: 0 2px;
+  vertical-align: middle;
+}
+
+.inline-template-field input {
+  width: min(220px, 42vw);
+  min-width: 96px;
+  padding: 4px 8px;
+  border: 1px solid var(--slate-200);
+  border-radius: 8px;
+  background: var(--teal-soft);
+  font: inherit;
+}
+
+.inline-template-field.is-note input {
+  background: var(--amber-soft, #fef3c7);
+}
+
+.inline-mode-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--teal);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.inline-template-field.is-note .inline-mode-toggle {
+  color: var(--amber, #b45309);
 }
 
 @media (max-width: 900px) {

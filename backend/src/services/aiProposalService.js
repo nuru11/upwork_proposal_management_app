@@ -336,12 +336,67 @@ function projectProofRules(domainNorm) {
 - Ground project proof only in the provided descriptions and mentionNotes — do not invent what a project does`;
 }
 
+function normalizeEmptyKeys(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw httpError(400, 'emptyKeys must be a non-empty array');
+  }
+  const keys = raw
+    .map((item) => String(item || '').trim())
+    .filter((key) => key.startsWith('[') && key.endsWith(']') && key.length > 2)
+    .slice(0, 40);
+  if (keys.length === 0) {
+    throw httpError(
+      400,
+      'emptyKeys must contain bracket tokens like [Core Job Challenge]',
+    );
+  }
+  return [...new Set(keys)];
+}
+
+function normalizeFilledMap(raw) {
+  if (raw == null) return {};
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    throw httpError(400, 'filled must be an object');
+  }
+  const out = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const key = String(k || '').trim();
+    const val = String(v ?? '').trim();
+    if (key && val) out[key] = val.slice(0, 800);
+  }
+  return out;
+}
+
+function placeholderFillRules(lang, client, domainNorm) {
+  const arabic = lang === 'arabic';
+  return `- If the skeleton has [X%]: one simple number in a plain sentence${arabic ? ' in Arabic' : ' (e.g. "Around 60% of users…")'}. Do not copy the inspired-from example's numbers.
+- If the skeleton has [Authoritative Source]: keep it casual${arabic ? ' in Arabic (e.g. دراسات تجربة المستخدم تبين)' : ', like "UX studies show" or "research shows"'}. Do not cite a fancy report name or sound academic.
+- If the skeleton has [Link to Demo / Portfolio] or [Link to Similar Project]: use a selected project URL when provided. If the projects list is empty, write a short line that you are happy to share a similar build — do not invent a URL.
+- If the skeleton has [App Stack]: prefer Flutter. Use Capacitor only if the job is clearly a very small/simple app (few screens, mostly a site wrapper, no heavy native work like live GPS or matching). Fill [App Stack Reason] in plain talk (fast, one codebase, good for this project type).
+- If the skeleton has [Backend Stack]: prefer Node.js unless the posting clearly requires something else.
+- If the skeleton has [Hosting Suggestion]: pick what fits THIS job's stage. Early / MVP / cost-sensitive → VPS now, cloud later. If they already need scale or name a cloud, recommend that instead. Do not invent a budget. Keep it to one short sentence.
+- If the skeleton has [Similar App Type] or [Concrete Outcome From That Build]: describe a similar shipped app in plain talk using selected projects when available. Concrete outcomes only (2-tap book, map that keeps updating). Do not invent metrics, years of experience, or a named app that is not in the projects list.
+- If the skeleton has [X]: use the number of selected projects (1, 2, 3…). If the projects list is empty, write "founders" / "apps like this"${arabic ? ' (Arabic: أصحاب تطبيقات / تطبيقات زي كذا — use ٢ / ٣ when you have a real count)' : ''} — do not invent "3".
+- If the skeleton has [App / startup type], [Measurable Result], or [Similar Approach]: fill a result-first opening that is concrete and job-specific (2-tap book, dual-app, store-live). No fake %, no years of experience, no named app that is not in the projects list.${arabic ? ' The Arabic opening must read as one natural sentence: ساعدت X يحقّقون [نتيجة] باستخدام [طريقة] — do not leave English word order.' : ''}
+- If the skeleton has [Specific Proof From a Similar Build]: one concrete outcome from a selected project; pair it with [Link to Similar Project]. If the projects list is empty, keep the proof general and do not invent a URL.
+- If the skeleton has [Shared Risk] / [Core Job Challenge]: name THIS job's real risk in plain talk (drop-off, store reject, laggy map, unclear price) — not a generic "I can help with your app".
+- If the skeleton has numbered step placeholders: fill a concrete plan for THIS job. Keep each step one short line.
+- If the skeleton has [Likely Objection]: pick one worry THIS client might have (two native teams, Flutter not feeling native, cost) and answer it in plain talk in the paired short-answer placeholder.
+- If the skeleton has a quick-win placeholder: one change they can make on the current flow or listing today. Not "hire me". Do not invent access to their codebase.
+- If the skeleton has [Business Question] or [Expert Question that baselines the work]: one short product question for THIS job (users, money, first-open path, why they leave a competitor). Not technical (no Flutter, APIs, hosting, GPS) and not timeline/budget. Easy to answer in one sentence. The client should feel that answering it baselines the work. Do not copy the inspired-from question unless it truly fits this job.
+- If the skeleton has [Their Goal]: this job's goal in a few words (booking, store launch, live map, week one).
+- Never invent a freelancer name. If the skeleton has [Your Name], sign off with ${arabic ? '"مع التحية،" only' : '"Best," only'}.
+- ${client ? `Address the client as ${client}` : arabic ? 'If the greeting has a client-name placeholder, use something like "مرحبا،" — do not invent a client name' : 'If the greeting has a client-name placeholder, use "there" — do not invent a client name'}.
+- ${projectProofRules(domainNorm)}
+- If the projects list is empty, still fill the similar-project hook in general terms without inventing a named app.`;
+}
+
 function languageInstructions(lang) {
   if (lang === 'arabic') {
     return `CRITICAL: The proposal body must be written entirely in Arabic.
 - Write the entire letter in simple everyday Arabic. Short sentences. Common words. Sound like a freelancer messaging a client, not a report.
 - Do NOT output English sentences. The JSON "body" value must be Arabic text.
-- The template skeleton and inspired-from example are English structure and tone only. Translate the flow into Arabic. Do not copy English wording.
+- If the skeleton or inspired-from example is already Arabic, fill placeholders and keep that Arabic flow. If they are English, translate the flow into Arabic. Never leave English sentences in the output (except project names and URLs).
 - Keep project names and URLs in their original form.
 - Greeting/sign-off in Arabic (e.g. مرحبا، / مع التحية،). Do not use Hi / Best.
 - Do NOT use stiff or translated-from-English phrasing. Keep it warm, direct, and a bit informal.
@@ -382,7 +437,7 @@ async function draftProposalFromTemplate({
   const arabic = lang === 'arabic';
   const prompt = `You write short Upwork cover letters that sound like a real freelancer typed them quickly — not like AI or a marketing page.
 
-Fill the template skeleton for this ${domainNorm} job. The skeleton is the structure of record — follow its paragraphs, greeting, "how I solve both" list, tech-stack suggestion, portfolio line, business question, and sign-off. Do NOT rewrite it as a problem-first Hook → per-issue → Proof → CTA letter.
+Fill the template skeleton for this ${domainNorm} job. The skeleton is the structure of record — follow its paragraphs, greeting, lists, questions, and sign-off exactly. Fill every [placeholder] for THIS job. Do NOT rewrite it as a different letter (no problem-first Hook → per-issue → Proof → CTA, and do not force a "how I solve both" / tech-stack layout if the skeleton does not have those sections).
 
 ${languageInstructions(lang)}
 
@@ -390,17 +445,7 @@ Rules:
 - Language: ${lang}${arabic ? ' (CRITICAL: body must be entirely in Arabic)' : ''}
 - Fill every [placeholder] for THIS job. Do not leave bracket placeholders in the output.
 - If an inspired-from example is provided, match its tone and flow only. Do not copy its names, metrics, project type, technical details, or CTA question unless they genuinely fit THIS job.${arabic ? ' Translate into Arabic; do not copy English sentences from the example or skeleton.' : ''}
-- For [X%]: one simple number in a plain sentence${arabic ? ' in Arabic' : ' (e.g. "Around 60% of users…")'}. Do not copy the inspired-from example's numbers.
-- For [Authoritative Source]: keep it casual${arabic ? ' in Arabic (e.g. دراسات تجربة المستخدم تبين)' : ', like "UX studies show" or "research shows"'}. Do not cite a fancy report name or sound academic.
-- For [Link to Demo / Portfolio]: use a selected project URL when provided. If the projects list is empty, write a short line that you are happy to share a similar build — do not invent a URL.
-- For [App Stack]: prefer Flutter. Use Capacitor only if the job is clearly a very small/simple app (few screens, mostly a site wrapper, no heavy native work like live GPS or matching). Fill [App Stack Reason] in plain talk (fast, one codebase, good for this project type).
-- For [Backend Stack]: prefer Node.js unless the posting clearly requires something else.
-- For [Hosting Suggestion]: pick what fits THIS job's stage. Early / MVP / cost-sensitive → VPS now, cloud later. If they already need scale or name a cloud, recommend that instead. Do not invent a budget. Keep it to one short sentence.
-- For [Business Question]: one short business question for THIS job (users, money, who to win first, why they leave a competitor). Not technical (no Flutter, APIs, hosting, GPS). Easy to answer in one sentence. The client should feel that answering it helps you make the app competitive. Do not copy the inspired-from question unless it truly fits this job.
-- Never invent a freelancer name. If the skeleton has [Your Name], sign off with ${arabic ? '"مع التحية،" only' : '"Best," only'}.
-- ${client ? `Address the client as ${client}` : arabic ? 'If the greeting has a client-name placeholder, use something like "مرحبا،" — do not invent a client name' : 'If the greeting has a client-name placeholder, use "there" — do not invent a client name'}.
-- ${projectProofRules(domainNorm)}
-- If the projects list is empty, still fill the similar-project hook in general terms without inventing a named app.
+${placeholderFillRules(lang, client, domainNorm)}
 
 Job posting:
 """
@@ -429,11 +474,92 @@ Respond with JSON only in this exact shape:
   return { body };
 }
 
+async function fillTemplateFields({
+  jobDescription,
+  domain,
+  language,
+  templateBody,
+  filled,
+  emptyKeys,
+  instructions,
+  projects,
+  clientName,
+  notes,
+}) {
+  const job = normalizeJobDescription(jobDescription);
+  const domainNorm = normalizeDomain(domain);
+  const lang = normalizeLanguage(language);
+  const template = templateBody ? String(templateBody).trim().slice(0, 4000) : '';
+  if (!template) {
+    throw httpError(400, 'templateBody is required');
+  }
+  const keys = normalizeEmptyKeys(emptyKeys);
+  const filledMap = normalizeFilledMap(filled);
+  const instructionsMap = normalizeFilledMap(instructions);
+  const projectsNorm = normalizeProjects(projects);
+  const notesNorm = normalizeNotes(notes);
+  const client = clientName ? String(clientName).trim().slice(0, 120) : '';
+  const arabic = lang === 'arabic';
+
+  const prompt = `You fill individual [placeholder] values for an Upwork cover letter. Return only the requested keys — not a full letter.
+
+${arabic
+    ? 'CRITICAL: Each value must be simple everyday Arabic. Short sentences. Common words. No English sentences except project names and URLs.'
+    : 'Voice: simple everyday English. Short sentences. Common words. Contractions are good (I\'ve, don\'t, it\'s).'}
+
+Rules:
+- Language: ${lang}${arabic ? ' (CRITICAL: values must be entirely in Arabic except names and URLs)' : ''}
+- Fill ONLY these keys: ${JSON.stringify(keys)}
+- Do not return a full proposal. Do not invent extra keys.
+- Already filled by the freelancer (do not change; use as context):
+${JSON.stringify(filledMap, null, 2)}
+- Freelancer notes/instructions for specific keys (write the finished field from the job + this hint; do not paste the hint unless it already is the finished line):
+${JSON.stringify(instructionsMap, null, 2)}
+${placeholderFillRules(lang, client, domainNorm)}
+
+Job posting:
+"""
+${job}
+"""
+${guidanceBlock(notesNorm)}
+My relevant projects (only use these):
+${JSON.stringify(projectsNorm, null, 2)}
+
+Template skeleton (context only — do not rewrite it):
+"""
+${template}
+"""
+
+Respond with JSON only in this exact shape:
+{
+  "values": {
+    ${keys.map((key) => `"${key.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}": "replacement text"`).join(',\n    ')}
+  }
+}`;
+
+  const result = await geminiClient.generateJson(prompt);
+  const rawValues = result.values;
+  if (!rawValues || typeof rawValues !== 'object' || Array.isArray(rawValues)) {
+    throw httpError(502, 'AI returned no field values');
+  }
+
+  const values = {};
+  for (const key of keys) {
+    const val = String(rawValues[key] ?? '').trim();
+    if (val) values[key] = val;
+  }
+  if (Object.keys(values).length === 0) {
+    throw httpError(502, 'AI returned empty field values');
+  }
+  return { values };
+}
+
 module.exports = {
   extractIssues,
   suggestSolutions,
   draftProposal,
   draftProposalFromTemplate,
+  fillTemplateFields,
   ALLOWED_DOMAINS,
   MAX_JOB_DESCRIPTION_LENGTH,
 };

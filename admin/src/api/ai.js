@@ -27,3 +27,10 @@ export function draftProposalFromTemplate(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export function fillTemplateFields(payload) {
+  return api('/ai/fill-template-fields', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

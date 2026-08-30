@@ -38,9 +38,19 @@ async function draftProposalFromTemplate(req, res) {
   }
 }
 
+async function fillTemplateFields(req, res) {
+  try {
+    const result = await aiProposalService.fillTemplateFields(req.body || {});
+    return res.json(result);
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+}
+
 module.exports = {
   extractIssues,
   suggestSolutions,
   draftProposal,
   draftProposalFromTemplate,
+  fillTemplateFields,
 };
