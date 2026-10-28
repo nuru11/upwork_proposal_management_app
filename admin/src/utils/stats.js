@@ -1,4 +1,4 @@
-import { STATUSES, LANGUAGES } from '../constants/enums';
+import { STATUSES, LANGUAGES, statusList } from '../constants/enums';
 
 export function computeStats(proposals, templates = []) {
   const templateNameById = Object.fromEntries(
@@ -6,13 +6,15 @@ export function computeStats(proposals, templates = []) {
   );
 
   const total = proposals.length;
-  const hired = proposals.filter((p) => p.status === 'hired').length;
+  const hired = proposals.filter((p) => statusList(p.status).includes('hired')).length;
 
   const byStatus = Object.fromEntries(STATUSES.map((s) => [s.value, 0]));
   proposals.forEach((p) => {
-    if (byStatus[p.status] != null) {
-      byStatus[p.status] += 1;
-    }
+    statusList(p.status).forEach((status) => {
+      if (byStatus[status] != null) {
+        byStatus[status] += 1;
+      }
+    });
   });
 
   const byLanguage = Object.fromEntries(
@@ -21,7 +23,7 @@ export function computeStats(proposals, templates = []) {
   proposals.forEach((p) => {
     const key = p.language in byLanguage ? p.language : 'english';
     byLanguage[key].total += 1;
-    if (p.status === 'hired') {
+    if (statusList(p.status).includes('hired')) {
       byLanguage[key].hired += 1;
     }
   });
@@ -34,7 +36,7 @@ export function computeStats(proposals, templates = []) {
     }
     const row = templateMap.get(key);
     row.total += 1;
-    if (p.status === 'hired') {
+    if (statusList(p.status).includes('hired')) {
       row.hired += 1;
     }
   });

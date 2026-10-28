@@ -33,7 +33,7 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
   final _notesController = TextEditingController();
 
   ProposalLanguage _language = ProposalLanguage.english;
-  ProposalStatus _status = ProposalStatus.submitted;
+  List<ProposalStatus> _statuses = const [ProposalStatus.submitted];
   ProposalProjectType _projectType = ProposalProjectType.mobileApp;
   String? _templateId;
   String? _templateName;
@@ -75,7 +75,7 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
     _bodyController.text = proposal.body;
     _notesController.text = proposal.notes ?? '';
     _language = proposal.language;
-    _status = proposal.status;
+    _statuses = List<ProposalStatus>.from(proposal.status);
     _projectType = proposal.projectType;
     _templateId = proposal.templateId;
     _loaded = true;
@@ -234,12 +234,13 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
           : _urlController.text.trim(),
       body: _bodyController.text.trim(),
       language: _language,
-      status: _status,
+      status: _statuses,
       projectType: _projectType,
       templateId: _templateId,
       notes: _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim(),
+      updatedVersion: existing?.updatedVersion,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       submittedAt: existing?.submittedAt ?? now,
@@ -446,8 +447,8 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
               spacing: 8,
               runSpacing: 8,
               children: ProposalStatus.values.map((status) {
-                final selected = _status == status;
-                return ChoiceChip(
+                final selected = _statuses.contains(status);
+                return FilterChip(
                   label: Text(status.label),
                   selected: selected,
                   selectedColor: AppTheme.statusSoftColor(status),
@@ -457,7 +458,21 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
                         : AppColors.slate700,
                     fontWeight: FontWeight.w600,
                   ),
-                  onSelected: (_) => setState(() => _status = status),
+                  onSelected: (_) {
+                    setState(() {
+                      final next = List<ProposalStatus>.from(_statuses);
+                      if (next.contains(status)) {
+                        if (next.length == 1) return;
+                        next.remove(status);
+                      } else {
+                        next.add(status);
+                      }
+                      _statuses = [
+                        for (final value in ProposalStatus.values)
+                          if (next.contains(value)) value,
+                      ];
+                    });
+                  },
                   showCheckmark: false,
                 );
               }).toList(),

@@ -81,7 +81,7 @@ export default function AiDraftDetailPage() {
           jobUrl: '',
           body: body.trim() || draft?.body || '',
           language: draft?.language || 'english',
-          status: 'submitted',
+          status: ['submitted'],
           projectType: 'mobileApp',
           templateId: '',
           notes: '',

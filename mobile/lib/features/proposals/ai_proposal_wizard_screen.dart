@@ -247,6 +247,9 @@ class _AiProposalWizardScreenState
 
   List<String> get _keysNeedingAi => _fieldControllers.keys.where((key) {
         final value = _fieldValues[key] ?? '';
+        if (isOptionalNamePlaceholder(key) && value.isEmpty && !_isNote(key)) {
+          return false;
+        }
         return value.isEmpty || _isNote(key);
       }).toList();
 
@@ -279,7 +282,7 @@ class _AiProposalWizardScreenState
         emptyKeys.add(key);
         instructions[key] = value;
       } else if (value.isEmpty) {
-        emptyKeys.add(key);
+        if (!isOptionalNamePlaceholder(key)) emptyKeys.add(key);
       } else {
         filled[key] = value;
       }
@@ -442,6 +445,7 @@ class _AiProposalWizardScreenState
       final solutions = await ref.read(aiApiProvider).suggestSolutions(
             jobDescription: _jobController.text.trim(),
             domain: _domain.name,
+            language: _language.name,
             issues: selected,
             notes: _guidanceNotes,
           );
@@ -621,7 +625,34 @@ class _AiProposalWizardScreenState
       }
     }
 
-    _draftController.text = applyPlaceholders(templateBody, values);
+    _draftController.text = stripOptionalNamePlaceholders(
+      applyPlaceholders(templateBody, values),
+    );
+    if (_language == ProposalLanguage.arabic) {
+      setState(() {
+        _loading = true;
+        _fieldBusyKey = null;
+        _error = null;
+      });
+      try {
+        final rewritten = await ref.read(aiApiProvider).rewriteProposalLanguage(
+              body: _draftController.text,
+              language: _language.name,
+            );
+        if (!mounted) return;
+        if (rewritten.trim().isNotEmpty) {
+          _draftController.text = rewritten.trim();
+        }
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _error = _friendlyError(e);
+        });
+        return;
+      }
+    }
+    if (!mounted) return;
     setState(() {
       _step = _draftStep;
       _loading = false;
@@ -1066,7 +1097,9 @@ class _AiProposalWizardScreenState
           ),
           const SizedBox(height: 4),
           Text(
-            'Abs = use as-is. Note = instruction for AI. Tap the label to switch.',
+            _language == ProposalLanguage.arabic
+                ? 'Abs = use as-is. Note = instruction for AI. Tap the label to switch. The field editor keeps the template\'s English frame. The generated draft will be fully Arabic.'
+                : 'Abs = use as-is. Note = instruction for AI. Tap the label to switch.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.slate500,
                 ),
@@ -1321,6 +1354,56 @@ class _AiProposalWizardScreenState
             labelText: 'Proposal body',
             alignLabelWithHint: true,
           ),
+        ),
+        const SizedBox(height: 16),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _draftController,
+          builder: (context, value, _) {
+            const previewChars = 250;
+            final raw = value.text;
+            final preview = raw.isEmpty
+                ? 'Generate a draft to see what clients read first.'
+                : raw.length <= previewChars
+                    ? raw
+                    : '${raw.substring(0, previewChars)}…';
+            final countLabel = raw.isEmpty
+                ? 'Upwork preview (first 250 characters)'
+                : 'Upwork preview (first 250 characters) · ${raw.length < previewChars ? raw.length : previewChars}/$previewChars';
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  countLabel,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.slate500,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.slate100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.slate200),
+                  ),
+                  child: Text(
+                    preview,
+                    textDirection: _language == ProposalLanguage.arabic
+                        ? TextDirection.rtl
+                        : TextDirection.ltr,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.slate700,
+                          height: 1.45,
+                        ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );

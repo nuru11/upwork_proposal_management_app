@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 enum ProposalLanguage {
   english,
   arabic;
@@ -36,6 +38,53 @@ enum ProposalStatus {
       orElse: () => ProposalStatus.submitted,
     );
   }
+
+  static ProposalStatus? _match(String value) {
+    for (final status in ProposalStatus.values) {
+      if (status.name == value) return status;
+    }
+    return null;
+  }
+
+  static List<ProposalStatus> listFromStorage(dynamic value) {
+    final names = <String>[];
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.startsWith('[')) {
+        try {
+          final decoded = jsonDecode(trimmed);
+          if (decoded is List) {
+            names.addAll(decoded.map((item) => item.toString()));
+          }
+        } catch (_) {
+          final single = _match(trimmed);
+          if (single != null) return [single];
+        }
+      } else if (trimmed.isNotEmpty) {
+        names.add(trimmed);
+      }
+    } else if (value is List) {
+      names.addAll(value.map((item) => item.toString()));
+    }
+
+    final statuses = <ProposalStatus>[];
+    for (final status in ProposalStatus.values) {
+      if (names.contains(status.name) && !statuses.contains(status)) {
+        statuses.add(status);
+      }
+    }
+    if (statuses.isEmpty) return [ProposalStatus.submitted];
+    return statuses;
+  }
+
+  static String listToStorage(List<ProposalStatus> statuses) {
+    final names = <String>[
+      for (final status in ProposalStatus.values)
+        if (statuses.contains(status)) status.name,
+    ];
+    if (names.isEmpty) names.add(ProposalStatus.submitted.name);
+    return jsonEncode(names);
+  }
 }
 
 enum ProposalProjectType {
@@ -69,6 +118,7 @@ class Proposal {
     required this.projectType,
     this.templateId,
     this.notes,
+    this.updatedVersion,
     required this.createdAt,
     required this.updatedAt,
     this.submittedAt,
@@ -80,10 +130,11 @@ class Proposal {
   final String? jobUrl;
   final String body;
   final ProposalLanguage language;
-  final ProposalStatus status;
+  final List<ProposalStatus> status;
   final ProposalProjectType projectType;
   final String? templateId;
   final String? notes;
+  final String? updatedVersion;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? submittedAt;
@@ -95,10 +146,11 @@ class Proposal {
     String? jobUrl,
     String? body,
     ProposalLanguage? language,
-    ProposalStatus? status,
+    List<ProposalStatus>? status,
     ProposalProjectType? projectType,
     String? templateId,
     String? notes,
+    String? updatedVersion,
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? submittedAt,
@@ -106,6 +158,7 @@ class Proposal {
     bool clearJobUrl = false,
     bool clearTemplateId = false,
     bool clearNotes = false,
+    bool clearUpdatedVersion = false,
     bool clearSubmittedAt = false,
   }) {
     return Proposal(
@@ -119,6 +172,9 @@ class Proposal {
       projectType: projectType ?? this.projectType,
       templateId: clearTemplateId ? null : (templateId ?? this.templateId),
       notes: clearNotes ? null : (notes ?? this.notes),
+      updatedVersion: clearUpdatedVersion
+          ? null
+          : (updatedVersion ?? this.updatedVersion),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       submittedAt: clearSubmittedAt ? null : (submittedAt ?? this.submittedAt),
@@ -133,10 +189,11 @@ class Proposal {
       'job_url': jobUrl,
       'body': body,
       'language': language.name,
-      'status': status.name,
+      'status': ProposalStatus.listToStorage(status),
       'project_type': projectType.name,
       'template_id': templateId,
       'notes': notes,
+      'updated_version': updatedVersion,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'submitted_at': submittedAt?.toIso8601String(),
@@ -151,12 +208,13 @@ class Proposal {
       jobUrl: map['job_url'] as String?,
       body: map['body'] as String,
       language: ProposalLanguage.fromStorage(map['language'] as String),
-      status: ProposalStatus.fromStorage(map['status'] as String),
+      status: ProposalStatus.listFromStorage(map['status']),
       projectType: ProposalProjectType.fromStorage(
         (map['project_type'] as String?) ?? 'other',
       ),
       templateId: map['template_id'] as String?,
       notes: map['notes'] as String?,
+      updatedVersion: map['updated_version'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
       submittedAt: map['submitted_at'] != null
@@ -173,10 +231,11 @@ class Proposal {
       'jobUrl': jobUrl,
       'body': body,
       'language': language.name,
-      'status': status.name,
+      'status': status.map((item) => item.name).toList(),
       'projectType': projectType.name,
       'templateId': templateId,
       'notes': notes,
+      'updatedVersion': updatedVersion,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'submittedAt': submittedAt?.toIso8601String(),
@@ -191,12 +250,13 @@ class Proposal {
       jobUrl: json['jobUrl'] as String?,
       body: json['body'] as String,
       language: ProposalLanguage.fromStorage(json['language'] as String),
-      status: ProposalStatus.fromStorage(json['status'] as String),
+      status: ProposalStatus.listFromStorage(json['status']),
       projectType: ProposalProjectType.fromStorage(
         (json['projectType'] as String?) ?? 'other',
       ),
       templateId: json['templateId'] as String?,
       notes: json['notes'] as String?,
+      updatedVersion: json['updatedVersion'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       submittedAt: json['submittedAt'] != null

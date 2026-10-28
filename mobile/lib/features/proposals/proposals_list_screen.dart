@@ -312,7 +312,9 @@ class _ProposalTile extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  StatusChip(status: proposal.status, compact: true),
+                  ...proposal.status.map(
+                    (status) => StatusChip(status: status, compact: true),
+                  ),
                   LanguageChip(language: proposal.language),
                   ProjectTypeChip(
                     projectType: proposal.projectType,

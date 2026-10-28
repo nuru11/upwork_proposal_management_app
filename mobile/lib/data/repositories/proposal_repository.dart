@@ -20,8 +20,8 @@ class ProposalRepository {
     final args = <Object?>[];
 
     if (status != null) {
-      where.add('status = ?');
-      args.add(status.name);
+      where.add('instr(status, ?) > 0');
+      args.add('"${status.name}"');
     }
     if (language != null) {
       where.add('language = ?');
@@ -80,15 +80,20 @@ class ProposalRepository {
   }
 
   Future<Map<ProposalStatus, int>> countByStatus() async {
-    final rows = await _db.rawQuery(
-      'SELECT status, COUNT(*) as count FROM proposals GROUP BY status',
-    );
-    final result = {for (final s in ProposalStatus.values) s: 0};
-    for (final row in rows) {
-      final status = ProposalStatus.fromStorage(row['status'] as String);
-      result[status] = row['count'] as int;
-    }
-    return result;
+    final rows = await _db.rawQuery('''
+      SELECT
+        SUM(CASE WHEN instr(status, '"submitted"') > 0 THEN 1 ELSE 0 END) AS submitted,
+        SUM(CASE WHEN instr(status, '"viewed"') > 0 THEN 1 ELSE 0 END) AS viewed,
+        SUM(CASE WHEN instr(status, '"responded"') > 0 THEN 1 ELSE 0 END) AS responded,
+        SUM(CASE WHEN instr(status, '"hired"') > 0 THEN 1 ELSE 0 END) AS hired,
+        SUM(CASE WHEN instr(status, '"rejected"') > 0 THEN 1 ELSE 0 END) AS rejected
+      FROM proposals
+    ''');
+    final row = rows.isEmpty ? <String, Object?>{} : rows.first;
+    int countFor(String name) => (row[name] as int?) ?? 0;
+    return {
+      for (final status in ProposalStatus.values) status: countFor(status.name),
+    };
   }
 
   Future<Map<ProposalLanguage, ({int total, int hired})>>
@@ -96,7 +101,7 @@ class ProposalRepository {
     final rows = await _db.rawQuery('''
       SELECT language,
              COUNT(*) as total,
-             SUM(CASE WHEN status = 'hired' THEN 1 ELSE 0 END) as hired
+             SUM(CASE WHEN instr(status, '"hired"') > 0 THEN 1 ELSE 0 END) as hired
       FROM proposals
       GROUP BY language
     ''');
@@ -119,7 +124,7 @@ class ProposalRepository {
     final rows = await _db.rawQuery('''
       SELECT template_id,
              COUNT(*) as total,
-             SUM(CASE WHEN status = 'hired' THEN 1 ELSE 0 END) as hired
+             SUM(CASE WHEN instr(status, '"hired"') > 0 THEN 1 ELSE 0 END) as hired
       FROM proposals
       WHERE template_id IS NOT NULL
       GROUP BY template_id
@@ -139,7 +144,7 @@ class ProposalRepository {
   Future<({int total, int hired})> overallHireStats() async {
     final rows = await _db.rawQuery('''
       SELECT COUNT(*) as total,
-             SUM(CASE WHEN status = 'hired' THEN 1 ELSE 0 END) as hired
+             SUM(CASE WHEN instr(status, '"hired"') > 0 THEN 1 ELSE 0 END) as hired
       FROM proposals
     ''');
     if (rows.isEmpty) return (total: 0, hired: 0);

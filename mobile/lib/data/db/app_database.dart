@@ -12,7 +12,7 @@ class AppDatabase {
   Database get database => _db;
 
   static const _dbName = 'proposal_manager.db';
-  static const _dbVersion = 9;
+  static const _dbVersion = 11;
 
   static Future<AppDatabase> open() async {
     if (kIsWeb) {
@@ -61,6 +61,7 @@ class AppDatabase {
         project_type TEXT NOT NULL DEFAULT 'other',
         template_id TEXT,
         notes TEXT,
+        updated_version TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         submitted_at TEXT,
@@ -123,6 +124,31 @@ class AppDatabase {
     if (oldVersion < 9) {
       await _addTemplateInspiredFromColumn(db);
     }
+    if (oldVersion < 10) {
+      await _convertProposalStatusToList(db);
+    }
+    if (oldVersion < 11) {
+      await _addProposalUpdatedVersionColumn(db);
+    }
+  }
+
+  static Future<void> _addProposalUpdatedVersionColumn(Database db) async {
+    final info = await db.rawQuery('PRAGMA table_info(proposals)');
+    final hasUpdatedVersion =
+        info.any((row) => row['name'] == 'updated_version');
+    if (!hasUpdatedVersion) {
+      await db.execute(
+        'ALTER TABLE proposals ADD COLUMN updated_version TEXT',
+      );
+    }
+  }
+
+  static Future<void> _convertProposalStatusToList(Database db) async {
+    await db.execute('''
+      UPDATE proposals
+      SET status = '["' || status || '"]'
+      WHERE status NOT LIKE '[%'
+    ''');
   }
 
   static Future<void> _createProjects(Database db) async {

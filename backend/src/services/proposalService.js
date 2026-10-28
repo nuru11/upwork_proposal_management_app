@@ -1,13 +1,31 @@
 const { query } = require('../config/db');
 const Proposal = require('../models/Proposal');
 
+function resolveStatuses(status) {
+  if (status == null || status === '') {
+    return ['submitted'];
+  }
+  const normalized = Proposal.normalizeStatuses(status);
+  if (normalized.length === 0) {
+    const err = new Error('At least one valid status is required');
+    err.status = 400;
+    throw err;
+  }
+  return normalized;
+}
+
 async function list(userId, { status, language, projectType, search } = {}) {
   const where = ['user_id = ?', 'deleted_at IS NULL'];
   const params = [userId];
 
   if (status) {
-    where.push('status = ?');
-    params.push(status);
+    if (!Proposal.ALLOWED_STATUSES.has(status)) {
+      const err = new Error(`Invalid status filter: ${status}`);
+      err.status = 400;
+      throw err;
+    }
+    where.push('JSON_CONTAINS(status, ?)');
+    params.push(JSON.stringify(status));
   }
   if (language) {
     where.push('language = ?');
@@ -52,7 +70,7 @@ async function create(userId, payload) {
   const cols = Proposal.toDbColumns({
     ...payload,
     language: payload.language || 'english',
-    status: payload.status || 'submitted',
+    status: resolveStatuses(payload.status),
     projectType: payload.projectType,
     createdAt: payload.createdAt || new Date().toISOString(),
     updatedAt: payload.updatedAt || new Date().toISOString(),
@@ -61,9 +79,9 @@ async function create(userId, payload) {
   await query(
     `INSERT INTO proposals (
       id, user_id, title, client_name, job_url, body, language, status,
-      project_type, template_id, notes, created_at, updated_at, submitted_at,
-      deleted_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+      project_type, template_id, notes, updated_version, created_at, updated_at,
+      submitted_at, deleted_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
     ON DUPLICATE KEY UPDATE
       title = VALUES(title),
       client_name = VALUES(client_name),
@@ -74,6 +92,7 @@ async function create(userId, payload) {
       project_type = VALUES(project_type),
       template_id = VALUES(template_id),
       notes = VALUES(notes),
+      updated_version = VALUES(updated_version),
       updated_at = VALUES(updated_at),
       submitted_at = VALUES(submitted_at),
       deleted_at = NULL`,
@@ -89,6 +108,7 @@ async function create(userId, payload) {
       cols.project_type,
       cols.template_id,
       cols.notes,
+      cols.updated_version,
       cols.created_at,
       cols.updated_at,
       cols.submitted_at,
@@ -110,6 +130,9 @@ async function update(userId, id, payload) {
     ...existing,
     ...payload,
     id,
+    status: resolveStatuses(
+      payload.status === undefined ? existing.status : payload.status,
+    ),
     updatedAt: payload.updatedAt || new Date().toISOString(),
   };
   const cols = Proposal.toDbColumns(merged);
@@ -118,7 +141,7 @@ async function update(userId, id, payload) {
     `UPDATE proposals SET
       title = ?, client_name = ?, job_url = ?, body = ?, language = ?,
       status = ?, project_type = ?, template_id = ?, notes = ?,
-      updated_at = ?, submitted_at = ?, deleted_at = NULL
+      updated_version = ?, updated_at = ?, submitted_at = ?, deleted_at = NULL
      WHERE id = ? AND user_id = ?`,
     [
       cols.title,
@@ -130,6 +153,7 @@ async function update(userId, id, payload) {
       cols.project_type,
       cols.template_id,
       cols.notes,
+      cols.updated_version,
       cols.updated_at,
       cols.submitted_at,
       id,

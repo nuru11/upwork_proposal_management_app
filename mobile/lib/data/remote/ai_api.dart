@@ -29,12 +29,14 @@ class AiApi {
   Future<List<AiSolution>> suggestSolutions({
     required String jobDescription,
     required String domain,
+    required String language,
     required List<AiIssue> issues,
     String? notes,
   }) async {
     final body = await _client.postJson('/api/ai/suggest-solutions', {
       'jobDescription': jobDescription,
       'domain': domain,
+      'language': language,
       'issues': issues.map((e) => e.toJson()).toList(),
       if (notes != null && notes.isNotEmpty) 'notes': notes,
     });
@@ -126,6 +128,17 @@ class AiApi {
     final raw = body['values'];
     if (raw is! Map) return {};
     return raw.map((key, value) => MapEntry(key.toString(), value.toString()));
+  }
+
+  Future<String> rewriteProposalLanguage({
+    required String body,
+    required String language,
+  }) async {
+    final result = await _client.postJson('/api/ai/rewrite-proposal-language', {
+      'body': body,
+      'language': language,
+    });
+    return result['body']?.toString() ?? '';
   }
 
   List<Map<String, Object?>> _projectsPayload(List<AiProjectMention> projects) {

@@ -13,6 +13,7 @@ import {
   LANGUAGES,
   PROPOSAL_PROJECT_TYPES,
   labelFor,
+  statusList,
 } from '../../constants/enums';
 
 export default function ProposalDetailPage() {
@@ -23,8 +24,13 @@ export default function ProposalDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [updatedVersion, setUpdatedVersion] = useState('');
+  const [reviewSaved, setReviewSaved] = useState(false);
+  const [copiedVersion, setCopiedVersion] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -32,6 +38,9 @@ export default function ProposalDetailPage() {
     try {
       const data = await getProposal(id);
       setItem(data);
+      setNotes(data.notes || '');
+      setUpdatedVersion(data.updatedVersion || '');
+      setReviewSaved(false);
       if (data.templateId) {
         try {
           const tpl = await getTemplate(data.templateId);
@@ -54,14 +63,18 @@ export default function ProposalDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  async function changeStatus(status) {
-    if (!item || status === item.status) return;
+  async function toggleStatus(value) {
+    if (!item || busy) return;
+    const current = statusList(item.status);
+    const has = current.includes(value);
+    const next = has ? current.filter((s) => s !== value) : [...current, value];
+    if (!next.length) return;
     setBusy(true);
     setError('');
     try {
       const updated = await updateProposal(id, {
         ...item,
-        status,
+        status: statusList(next),
         updatedAt: new Date().toISOString(),
       });
       setItem(updated);
@@ -92,6 +105,40 @@ export default function ProposalDetailPage() {
       setTimeout(() => setCopied(false), 1500);
     } catch {
       setError('Could not copy to clipboard');
+    }
+  }
+
+  async function copyUpdatedVersion() {
+    if (!updatedVersion.trim()) return;
+    try {
+      await navigator.clipboard.writeText(updatedVersion);
+      setCopiedVersion(true);
+      setTimeout(() => setCopiedVersion(false), 1500);
+    } catch {
+      setError('Could not copy to clipboard');
+    }
+  }
+
+  async function saveReview() {
+    if (!item || reviewBusy) return;
+    setReviewBusy(true);
+    setError('');
+    setReviewSaved(false);
+    try {
+      const updated = await updateProposal(id, {
+        ...item,
+        notes: notes.trim() || null,
+        updatedVersion: updatedVersion.trim() || null,
+        updatedAt: new Date().toISOString(),
+      });
+      setItem(updated);
+      setNotes(updated.notes || '');
+      setUpdatedVersion(updated.updatedVersion || '');
+      setReviewSaved(true);
+    } catch (err) {
+      setError(err.message || 'Failed to save notes');
+    } finally {
+      setReviewBusy(false);
     }
   }
 
@@ -146,34 +193,85 @@ export default function ProposalDetailPage() {
             </div>
             <pre className="body-pre">{item.body}</pre>
           </div>
-          {item.notes ? (
-            <div className="detail-card">
-              <h2>Notes</h2>
-              <p className="pre-wrap">{item.notes}</p>
+          <div className="detail-card review-fields">
+            <label className="field">
+              <span>Notes</span>
+              <span className="field-hint">
+                How to improve this proposal, or its weaknesses.
+              </span>
+              <textarea
+                rows={4}
+                value={notes}
+                onChange={(e) => {
+                  setNotes(e.target.value);
+                  setReviewSaved(false);
+                }}
+              />
+            </label>
+            <div>
+              <div className="detail-card-header">
+                <label className="field" htmlFor="updated-version">
+                  <span>Updated version</span>
+                  <span className="field-hint">The improved proposal.</span>
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={copyUpdatedVersion}
+                  disabled={!updatedVersion.trim()}
+                >
+                  {copiedVersion ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <textarea
+                id="updated-version"
+                className="review-textarea"
+                rows={10}
+                value={updatedVersion}
+                onChange={(e) => {
+                  setUpdatedVersion(e.target.value);
+                  setReviewSaved(false);
+                }}
+              />
             </div>
-          ) : null}
+            <div className="header-actions">
+              {reviewSaved ? <span className="field-hint">Saved</span> : null}
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={saveReview}
+                disabled={reviewBusy}
+              >
+                {reviewBusy ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
         </div>
 
         <aside className="detail-side">
           <div className="detail-card">
             <h2>Status</h2>
             <div className="status-row">
-              <StatusBadge status={item.status} />
+              {statusList(item.status).map((status) => (
+                <StatusBadge key={status} status={status} />
+              ))}
             </div>
-            <label className="field">
-              <span>Update status</span>
-              <select
-                value={item.status}
-                disabled={busy}
-                onChange={(e) => changeStatus(e.target.value)}
-              >
+            <fieldset className="field">
+              <legend>Update status</legend>
+              <div className="chip-grid">
                 {STATUSES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
+                  <label key={s.value} className="chip-check">
+                    <input
+                      type="checkbox"
+                      checked={statusList(item.status).includes(s.value)}
+                      disabled={busy}
+                      onChange={() => toggleStatus(s.value)}
+                    />
+                    <span>{s.label}</span>
+                  </label>
                 ))}
-              </select>
-            </label>
+              </div>
+            </fieldset>
           </div>
 
           <div className="detail-card">

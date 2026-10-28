@@ -11,6 +11,7 @@ import {
   STATUSES,
   LANGUAGES,
   PROPOSAL_PROJECT_TYPES,
+  statusList,
 } from '../../constants/enums';
 import TemplateFillModal from '../../components/TemplateFillModal';
 import { extractPlaceholders } from '../../utils/templatePlaceholders';
@@ -21,7 +22,7 @@ const blank = {
   jobUrl: '',
   body: '',
   language: 'english',
-  status: 'submitted',
+  status: ['submitted'],
   projectType: 'mobileApp',
   templateId: '',
   notes: '',
@@ -39,10 +40,11 @@ export default function ProposalFormPage() {
     const snap = location.state?.formSnapshot;
     const aiBody = location.state?.aiBody;
     if (!snap && !aiBody) return blank;
-    return {
+    const next = {
       ...(snap || blank),
       ...(aiBody ? { body: aiBody } : {}),
     };
+    return { ...next, status: statusList(next.status) };
   });
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(
@@ -92,7 +94,7 @@ export default function ProposalFormPage() {
             jobUrl: item.jobUrl || '',
             body: item.body || '',
             language: item.language || 'english',
-            status: item.status || 'submitted',
+            status: statusList(item.status),
             projectType: item.projectType || 'mobileApp',
             templateId: item.templateId || '',
             notes: item.notes || '',
@@ -111,6 +113,17 @@ export default function ProposalFormPage() {
 
   function setField(key, value) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function toggleStatus(value) {
+    setForm((f) => {
+      const current = statusList(f.status);
+      const has = current.includes(value);
+      const next = has
+        ? current.filter((s) => s !== value)
+        : [...current, value];
+      return { ...f, status: next.length ? statusList(next) : current };
+    });
   }
 
   function onTemplateChange(templateId) {
@@ -265,20 +278,23 @@ export default function ProposalFormPage() {
           </label>
         </div>
 
-        <div className="form-row cols-3">
-          <label className="field">
-            <span>Status</span>
-            <select
-              value={form.status}
-              onChange={(e) => setField('status', e.target.value)}
-            >
-              {STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <fieldset className="field">
+          <legend>Status</legend>
+          <div className="chip-grid">
+            {STATUSES.map((s) => (
+              <label key={s.value} className="chip-check">
+                <input
+                  type="checkbox"
+                  checked={statusList(form.status).includes(s.value)}
+                  onChange={() => toggleStatus(s.value)}
+                />
+                <span>{s.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <div className="form-row">
           <label className="field">
             <span>Language</span>
             <select

@@ -214,6 +214,87 @@ Best,`;
       now,
     });
     console.log('Upserted template "Proof-first 5-section (AR)".');
+
+    const researchHookId = '5a7c9e2b-8d1f-4c3a-b6e0-9f2d4a8c1b7e';
+    const researchHookBody = `Hi [Client Name / "there"],
+I went through [What I Looked At]; [Specific Compliment]. I like that, and when I searched [Market] apps like [Named Competitor], I found [Competitor Insight], so I'd start with [Short Opening Suggest].
+
+If you launch in [Market], the direct competitors are [Direct Competitors]. To win there you'd need [Must-Have Market Features]. Their weak spots are [Competitor Downsides], so we can [Our Angle To Win].
+
+Those apps usually got the first wave of downloads from [Early Growth Tactic]. I'd use that same path, then keep users with [Retention Angle].
+
+I'd ship this with [App Stack] because [App Stack Reason]. Backend [Backend Stack]. Hosting: [Hosting Suggestion].
+You can see a similar app here: [Link to Similar Project].
+
+[Expert Question that baselines the work]
+Happy to jump on a quick chat.
+Best,
+[Your Name]`;
+    const researchHookInspired = `Hi,
+
+I went through your dual-app booking idea; the customer + driver split is the right call. I like that, and when I searched Saudi apps like Jahez, I found they win on ordering in a few taps, so I'd start with a 2-tap first open.
+
+If you launch in Saudi / GCC, the direct competitors are Jahez, HungerStation, and Careem. To win there you'd need Arabic-first UI, local payments like Mada, and a map that doesn't lag. Their weak spots are messy first-open flows and tracking that drops on weak networks, so we can win on a 2-tap book and live tracking that stays up.
+
+Those apps usually got the first wave of downloads from restaurant partnerships and store featuring, not from a huge ad budget. I'd use that same path, then keep users with a clear price before they confirm and a map that keeps updating.
+
+I'd ship this with Flutter because one codebase stays fast on both phones. Backend I'd keep on Node.js. At the start a VPS keeps cost low, and we can move to the cloud later if traffic grows.
+You can see a similar app here: [Insert Link].
+
+When someone opens the app in Riyadh, what should feel easy first — booking in a few taps, or seeing a clear price before they confirm?
+Happy to jump on a quick chat.
+Best,`;
+
+    await upsertTemplate(connection, {
+      id: researchHookId,
+      userId,
+      name: 'Research hook — liked / found',
+      body: researchHookBody,
+      inspiredFrom: researchHookInspired,
+      language: 'english',
+      now,
+    });
+    console.log('Upserted template "Research hook — liked / found".');
+
+    const researchHookArId = '6b8d0f3c-9e2a-4d5b-a7c1-0e3f5b9d2c8a';
+    const researchHookArBody = `مرحبا [Client Name / ""],
+شفت [What I Looked At]؛ [Specific Compliment]. عجبني كذا، ولما بحثت تطبيقات [Market] زي [Named Competitor]، لقيت [Competitor Insight]، فبأبدأ بـ [Short Opening Suggest].
+
+لو تطلق في [Market]، المنافسين المباشرين [Direct Competitors]. عشان تفوز هناك تحتاج [Must-Have Market Features]. نقاط ضعفهم [Competitor Downsides]، فتقدر [Our Angle To Win].
+
+هالتطبيقات عادة أول تحميلاتهم جت من [Early Growth Tactic]. بنفس الطريق، وبعدين نمسك المستخدم بـ [Retention Angle].
+
+بأبنيه بـ [App Stack] لأن [App Stack Reason]. الباكند [Backend Stack]. الاستضافة: [Hosting Suggestion].
+تقدر تشوف تطبيق مشابه هنا: [Link to Similar Project].
+
+[Expert Question that baselines the work]
+نقدر نتكلم بسرعة.
+مع التحية،`;
+    const researchHookArInspired = `مرحبا،
+
+شفت فكرة تطبيق الحجز (عملاء + سائقين)؛ فصل الطرفين قرار صحيح. عجبني كذا، ولما بحثت تطبيقات السعودية زي جاهز، لقيت إنهم يفوزون بالطلب في كم لمسة، فبأبدأ بفتحة بلمستين.
+
+لو تطلق في السعودية / الخليج، المنافسين المباشرين جاهز وهنقرستيشن وكريم. عشان تفوز هناك تحتاج واجهة عربية أولاً، دفع محلي مثل مدى، وخريطة ما تتقطع. نقاط ضعفهم أول شاشة مزدحمة وتتبع يسقط على شبكة ضعيفة، فتقدر تفوز بحجز بلمستين وتتبع يفضل شغال.
+
+هالتطبيقات عادة أول تحميلاتهم جت من شراكات المطاعم وظهور في المتجر، مو من ميزانية إعلان ضخمة. بنفس الطريق، وبعدين نمسك المستخدم بسعر واضح قبل التأكيد وخريطة تحدّث حالها.
+
+بأبنيه بـ Flutter لأن كود واحد يبقى سريع على الجوالين. الباكند Node.js. في البداية VPS يبقي التكلفة منخفضة، ونقدر ننتقل للسحابة لو الزحمة زادت.
+تقدر تشوف تطبيق مشابه هنا: [Insert Link].
+
+لما أحد يفتح التطبيق في الرياض، وش المفروض يكون سهل أولاً — حجز بكم لمسة، ولا سعر واضح قبل التأكيد؟
+نقدر نتكلم بسرعة.
+مع التحية،`;
+
+    await upsertTemplate(connection, {
+      id: researchHookArId,
+      userId,
+      name: 'Research hook — liked / found (AR)',
+      body: researchHookArBody,
+      inspiredFrom: researchHookArInspired,
+      language: 'arabic',
+      now,
+    });
+    console.log('Upserted template "Research hook — liked / found (AR)".');
   } finally {
     await connection.end();
   }

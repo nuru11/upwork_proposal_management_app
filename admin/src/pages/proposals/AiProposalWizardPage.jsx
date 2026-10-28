@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { draftProposal, extractIssues, fillTemplateFields, suggestSolutions } from '../../api/ai';
+import { draftProposal, extractIssues, fillTemplateFields, rewriteProposalLanguage, suggestSolutions } from '../../api/ai';
 import InlineTemplatePreview from '../../components/InlineTemplatePreview';
 import {
   applyPlaceholders,
   extractPlaceholders,
   isClientNamePlaceholder,
+  isOptionalNamePlaceholder,
+  stripOptionalNamePlaceholders,
 } from '../../utils/templatePlaceholders';
 import { createAiDraft, titleFromJob } from '../../api/aiDrafts';
 import { listProjects } from '../../api/projects';
@@ -30,6 +32,16 @@ function previewDescription(text) {
   const trimmed = (text || '').trim();
   if (!trimmed) return 'No description';
   return trimmed.length > 100 ? `${trimmed.slice(0, 100)}…` : trimmed;
+}
+
+const UPWORK_PREVIEW_CHARS = 250;
+
+function upworkPreview(text) {
+  const raw = String(text || '');
+  if (!raw) return '';
+  return raw.length <= UPWORK_PREVIEW_CHARS
+    ? raw
+    : `${raw.slice(0, UPWORK_PREVIEW_CHARS)}…`;
 }
 
 export default function AiProposalWizardPage() {
@@ -268,6 +280,7 @@ export default function AiProposalWizardPage() {
       const result = await suggestSolutions({
         jobDescription: jobDescription.trim(),
         domain,
+        language,
         issues: selectedIssues.map(({ id, title, whyItFails }) => ({
           id,
           title: title.trim(),
@@ -339,6 +352,7 @@ export default function AiProposalWizardPage() {
 
   const keysNeedingAi = templateKeys.filter((key) => {
     const value = String(fieldValues[key] || '').trim();
+    if (isOptionalNamePlaceholder(key) && !value && !isNote(key)) return false;
     return !value || isNote(key);
   });
 
@@ -358,7 +372,7 @@ export default function AiProposalWizardPage() {
         emptyKeys.push(key);
         instructions[key] = value;
       } else if (!value) {
-        emptyKeys.push(key);
+        if (!isOptionalNamePlaceholder(key)) emptyKeys.push(key);
       } else {
         filled[key] = value;
       }
@@ -470,7 +484,25 @@ export default function AiProposalWizardPage() {
         return;
       }
     }
-    setDraftBody(applyPlaceholders(templateBody, values));
+    let assembled = stripOptionalNamePlaceholders(
+      applyPlaceholders(templateBody, values),
+    );
+    if (language === 'arabic') {
+      setBusy(true);
+      setError('');
+      try {
+        const result = await rewriteProposalLanguage({
+          body: assembled,
+          language,
+        });
+        assembled = String(result?.body || '').trim() || assembled;
+      } catch (err) {
+        setError(err.message || 'Could not rewrite to Arabic');
+        setBusy(false);
+        return;
+      }
+    }
+    setDraftBody(assembled);
     setStep(draftStep);
     setBusy(false);
     setFieldBusyKey(null);
@@ -768,6 +800,9 @@ export default function AiProposalWizardPage() {
               <span>Fill the highlighted fields</span>
               <p className="muted" style={{ margin: '0 0 8px' }}>
                 Abs = use as-is. Note = instruction for AI. Tap the label to switch.
+                {language === 'arabic'
+                  ? " The field editor keeps the template's English frame. The generated draft will be fully Arabic."
+                  : ''}
               </p>
               <div className="form-actions" style={{ justifyContent: 'flex-start', marginBottom: 10 }}>
                 <button
@@ -939,6 +974,20 @@ export default function AiProposalWizardPage() {
               disabled={busy}
             />
           </label>
+          <div className="upwork-preview-block">
+            <span className="upwork-preview-meta">
+              Upwork preview (first 250 characters)
+              {draftBody
+                ? ` · ${Math.min(draftBody.length, UPWORK_PREVIEW_CHARS)}/${UPWORK_PREVIEW_CHARS}`
+                : ''}
+            </span>
+            <p
+              className="upwork-preview"
+              dir={language === 'arabic' ? 'rtl' : 'ltr'}
+            >
+              {upworkPreview(draftBody) || 'Generate a draft to see what clients read first.'}
+            </p>
+          </div>
         </div>
       ) : null}
 

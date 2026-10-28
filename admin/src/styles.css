@@ -411,6 +411,13 @@ textarea {
   font-size: 13px;
 }
 
+.field > span.field-hint,
+.field-hint {
+  font-weight: 400;
+  color: var(--slate-500);
+  font-size: 13px;
+}
+
 .field fieldset,
 fieldset.field {
   border: none;
@@ -449,6 +456,10 @@ fieldset.field {
 
 .chip-check input {
   width: auto;
+  border: none;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
 }
 
 .form-actions {
@@ -585,6 +596,26 @@ fieldset.field {
   margin: 0;
 }
 
+.review-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.review-fields .header-actions {
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.review-textarea {
+  width: 100%;
+  border: 1px solid var(--slate-200);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: white;
+  font: inherit;
+}
+
 .body-pre,
 .pre-wrap {
   white-space: pre-wrap;
@@ -622,7 +653,14 @@ fieldset.field {
 }
 
 .status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 12px;
+}
+
+td .status-row {
+  margin-bottom: 0;
 }
 
 .modal-backdrop {
@@ -931,4 +969,28 @@ fieldset.field {
   font-size: 13px;
   font-weight: 400;
   color: var(--slate-500);
+}
+
+.upwork-preview-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.upwork-preview-meta {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--slate-500);
+}
+
+.upwork-preview {
+  margin: 0;
+  background: var(--slate-100);
+  border: 1px dashed var(--slate-200);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--slate-700);
+  white-space: pre-wrap;
+  line-height: 1.45;
 }

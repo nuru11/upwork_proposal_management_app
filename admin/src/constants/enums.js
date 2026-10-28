@@ -54,3 +54,17 @@ export const STATUS_COLORS = {
 export function labelFor(options, value) {
   return options.find((o) => o.value === value)?.label ?? value ?? '—';
 }
+
+const STATUS_VALUES = new Set(STATUSES.map((s) => s.value));
+
+export function statusList(status) {
+  const raw = Array.isArray(status)
+    ? status
+    : typeof status === 'string' && status
+      ? [status]
+      : [];
+  const ordered = STATUSES.map((s) => s.value).filter(
+    (value) => raw.includes(value) && STATUS_VALUES.has(value),
+  );
+  return ordered.length ? ordered : ['submitted'];
+}

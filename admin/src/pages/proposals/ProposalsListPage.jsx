@@ -8,6 +8,7 @@ import {
   LANGUAGES,
   PROPOSAL_PROJECT_TYPES,
   labelFor,
+  statusList,
 } from '../../constants/enums';
 
 const emptyFilters = {
@@ -180,7 +181,11 @@ export default function ProposalsListPage() {
                   </td>
                   <td>{item.clientName || '—'}</td>
                   <td>
-                    <StatusBadge status={item.status} />
+                    <div className="status-row">
+                      {statusList(item.status).map((status) => (
+                        <StatusBadge key={status} status={status} />
+                      ))}
+                    </div>
                   </td>
                   <td>{labelFor(LANGUAGES, item.language)}</td>
                   <td>{labelFor(PROPOSAL_PROJECT_TYPES, item.projectType)}</td>

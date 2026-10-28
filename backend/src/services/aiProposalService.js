@@ -2,6 +2,7 @@ const { randomUUID } = require('crypto');
 const geminiClient = require('./geminiClient');
 
 const MAX_JOB_DESCRIPTION_LENGTH = 8000;
+const MAX_PROPOSAL_BODY_LENGTH = 8000;
 const MAX_NOTES_LENGTH = 2000;
 const MAX_MENTION_NOTE_LENGTH = 500;
 const ALLOWED_DOMAINS = new Set([
@@ -161,6 +162,7 @@ async function extractIssues({ jobDescription, domain, language, notes }) {
   const job = normalizeJobDescription(jobDescription);
   const domainNorm = normalizeDomain(domain);
   const lang = normalizeLanguage(language);
+  const arabic = lang === 'arabic';
   const notesNorm = normalizeNotes(notes);
 
   const prompt = `You help a freelance developer write Upwork proposals.
@@ -174,11 +176,14 @@ ${guidanceBlock(notesNorm)}
 Respond with JSON only in this exact shape:
 {
   "issues": [
-    { "title": "short issue name", "whyItFails": "one sentence why this matters for this job" }
+    { "title": "${arabic ? 'short issue name in everyday Arabic' : 'short issue name'}", "whyItFails": "${arabic ? 'one sentence in everyday Arabic why this matters' : 'one sentence why this matters for this job'}" }
   ]
 }
 
-Language for title and whyItFails: ${lang}.
+Language for title and whyItFails: ${lang}.${arabic ? `
+CRITICAL: title and whyItFails must be written entirely in everyday Arabic. Short titles. Common words.
+- Do NOT output English sentences. Proper nouns and product names may stay in their original form.
+- The job posting may be English — treat it as source material only. Rewrite into Arabic.` : ''}
 Do not invent client names or fake requirements not implied by the job.`;
 
   const result = await geminiClient.generateJson(prompt);
@@ -189,9 +194,11 @@ Do not invent client names or fake requirements not implied by the job.`;
   return { issues };
 }
 
-async function suggestSolutions({ jobDescription, domain, issues, notes }) {
+async function suggestSolutions({ jobDescription, domain, issues, notes, language }) {
   const job = normalizeJobDescription(jobDescription);
   const domainNorm = normalizeDomain(domain);
+  const lang = normalizeLanguage(language);
+  const arabic = lang === 'arabic';
   const issuesNorm = normalizeIssues(issues);
   const notesNorm = normalizeNotes(notes);
 
@@ -214,12 +221,17 @@ Respond with JSON only in this exact shape:
     {
       "issueId": "same id as input",
       "issueTitle": "same title as input",
-      "offer": "concrete solution to offer"
+      "offer": "${arabic ? 'concrete solution in everyday Arabic' : 'concrete solution to offer'}"
     }
   ]
 }
 
-Include exactly one solution per input issue, preserving issueId and issueTitle.`;
+Include exactly one solution per input issue, preserving issueId and issueTitle.
+Language for each offer: ${lang}.${arabic ? `
+CRITICAL: Every offer must be written entirely in everyday Arabic. Short sentences. Common words.
+- Do NOT output English sentences. Product names and URLs may stay in their original form.
+- Keep issueTitle exactly as provided.
+- The job posting may be English — treat it as source material only. Rewrite the offer into Arabic.` : ''}`;
 
   const result = await geminiClient.generateJson(prompt);
   const byId = new Map(
@@ -265,6 +277,7 @@ async function draftProposal({
   const inspired = inspiredFrom ? String(inspiredFrom).trim().slice(0, 4000) : '';
   const client = clientName ? String(clientName).trim().slice(0, 120) : '';
 
+  const arabic = lang === 'arabic';
   const templateRules = [
     template
       ? '- If a template skeleton is provided, match its structure and fill every [placeholder] for this job. Do not leave bracket placeholders in the output.'
@@ -287,8 +300,14 @@ Write a problem-first proposal in this structure:
    - Always honor mentionNote when present (even if describe is false — use it as a short hint, not a long paragraph).
 4. Clear CTA (short call to discuss approach / timeline)
 
+${languageInstructions(lang)}
+
 Rules:
-- Language: ${lang}
+- Language: ${lang}${arabic ? ' (CRITICAL: body must be entirely in Arabic)' : ''}
+${arabic ? `- Rewrite every issue and solution into everyday Arabic. Do not paste Arabic titles into English sentences (no mixed-language fragments).
+- The job posting, notes, template, and inspired-from example are source material only. Output Arabic except project names and URLs.
+- Greeting/sign-off: مرحبا، / مع التحية، — not Hi / Best.
+- Never invent a freelancer name or title (no "Freelance Developer").` : ''}
 - Keep it concise (about 150–320 words; longer only if needed to mention every selected project)
 - Do NOT invent metrics, years of experience, features, or apps that are not in the projects list
 - Ground project proof only in the provided descriptions and mentionNotes — do not invent what a project does
@@ -316,7 +335,7 @@ ${inspired ? `Inspired-from example (tone and flow only — do not copy specific
 
 Respond with JSON only in this exact shape:
 {
-  "body": "full proposal cover letter text"
+  "body": "${arabic ? 'full proposal cover letter text, entirely in Arabic' : 'full proposal cover letter text'}"
 }`;
 
   const result = await geminiClient.generateJson(prompt);
@@ -334,6 +353,11 @@ function projectProofRules(domainNorm) {
   - If describe is true: rewrite how the project is relevant to THIS ${domainNorm} job. Do not paste or lightly rephrase the stored description. Use it as source material, then connect it to the posting. Never invent work that is not in the description or mentionNote.
   - Always honor mentionNote when present (even if describe is false — use it as a short hint, not a long paragraph).
 - Ground project proof only in the provided descriptions and mentionNotes — do not invent what a project does`;
+}
+
+function isOptionalNameKey(key) {
+  const t = String(key || '').toLowerCase();
+  return t.includes('client name') || t.includes('your name');
 }
 
 function normalizeEmptyKeys(raw) {
@@ -385,8 +409,20 @@ function placeholderFillRules(lang, client, domainNorm) {
 - If the skeleton has a quick-win placeholder: one change they can make on the current flow or listing today. Not "hire me". Do not invent access to their codebase.
 - If the skeleton has [Business Question] or [Expert Question that baselines the work]: one short product question for THIS job (users, money, first-open path, why they leave a competitor). Not technical (no Flutter, APIs, hosting, GPS) and not timeline/budget. Easy to answer in one sentence. The client should feel that answering it baselines the work. Do not copy the inspired-from question unless it truly fits this job.
 - If the skeleton has [Their Goal]: this job's goal in a few words (booking, store launch, live map, week one).
-- Never invent a freelancer name. If the skeleton has [Your Name], sign off with ${arabic ? '"مع التحية،" only' : '"Best," only'}.
-- ${client ? `Address the client as ${client}` : arabic ? 'If the greeting has a client-name placeholder, use something like "مرحبا،" — do not invent a client name' : 'If the greeting has a client-name placeholder, use "there" — do not invent a client name'}.
+- If the skeleton has [What I Looked At]: 3–8 words naming one specific thing from THIS posting (booking flow, dual-app split, live map, store listing). Not "your project" or "your job".
+- If the skeleton has [Specific Compliment]: one short genuine like (6–12 words). Concrete. No "great idea" / "exciting project".
+- If the skeleton has [Market]: the country or region named in the job (US, UK, EU, UAE…). If none is named, use ${arabic ? '"السعودية / الخليج"' : '"Saudi / GCC"'}. Keep it to 1–3 words.
+- If the skeleton has [Named Competitor]: ONE real, well-known app for this domain in that market. Prefer a name from freelancer notes. Never invent a fake app. If you are not sure of a real name, describe the category instead (e.g. "local food apps") — do not invent a brand.
+- If the skeleton has [Direct Competitors]: 2–3 real apps in that market + domain, same rules as [Named Competitor]. Prefer notes. Never invent names.
+- If the skeleton has [Competitor Insight]: one short clause (~8–12 words) for what you "found" when searching more — a real strength or tactic of that competitor that becomes our challenge (ordering in a few taps, strong first-open hooks).
+- If the skeleton has [Short Opening Suggest]: one short concrete first move (~6–10 words), not a paragraph (e.g. "a 2-tap first open").
+- Opening length: greeting + first paragraph (the looked / liked / searched / found / so I'd start beat) must stay around 250 characters so Upwork's preview contains the whole thought. Keep every opening placeholder short. Do not add extra sentences to the first paragraph.
+- If the skeleton has [Must-Have Market Features]: features that actually matter in THAT market (Saudi/GCC: Arabic-first UI, Mada / Apple Pay, local addresses; US/EU: what that market needs). Not generic "push notifications".
+- If the skeleton has [Competitor Downsides] / [Our Angle To Win]: real shippable weaknesses (laggy map, too many taps, unclear price) and how we improve them. No trash-talk. No fake metrics.
+- If the skeleton has [Early Growth Tactic]: a plausible first-download path for apps like this in that market (partnerships, store featuring, local ads). No fake download numbers.
+- If the skeleton has [Retention Angle]: how we keep users after that first wave (clear price before confirm, map that keeps updating). One short clause.
+- Never invent a freelancer name. If the skeleton has [Your Name], leave it empty — do not fill a greeting, sign-off, or fake name (not "Best,", not "مع التحية،", not "Freelance Developer"). Hi / Best (or مرحبا / مع التحية) stay outside this placeholder.
+- If the greeting has a client-name placeholder${client ? `, use ${client} only` : ', leave it empty — do not write "there", "مرحبا،", or "Hi"'}. Never put a greeting word in that placeholder.
 - ${projectProofRules(domainNorm)}
 - If the projects list is empty, still fill the similar-project hook in general terms without inventing a named app.`;
 }
@@ -445,6 +481,7 @@ Rules:
 - Language: ${lang}${arabic ? ' (CRITICAL: body must be entirely in Arabic)' : ''}
 - Fill every [placeholder] for THIS job. Do not leave bracket placeholders in the output.
 - If an inspired-from example is provided, match its tone and flow only. Do not copy its names, metrics, project type, technical details, or CTA question unless they genuinely fit THIS job.${arabic ? ' Translate into Arabic; do not copy English sentences from the example or skeleton.' : ''}
+${arabic ? '- The job posting, skeleton, and inspired-from example may be English. Treat them as source material only. Every sentence in the body must be Arabic except project names and URLs.' : ''}
 ${placeholderFillRules(lang, client, domainNorm)}
 
 Job posting:
@@ -509,6 +546,7 @@ ${arabic
 
 Rules:
 - Language: ${lang}${arabic ? ' (CRITICAL: values must be entirely in Arabic except names and URLs)' : ''}
+${arabic ? '- The job posting, skeleton, and inspired-from example may be English. Treat them as source material only. Every filled value must be Arabic except project names and URLs.' : ''}
 - Fill ONLY these keys: ${JSON.stringify(keys)}
 - Do not return a full proposal. Do not invent extra keys.
 - Already filled by the freelancer (do not change; use as context):
@@ -549,9 +587,63 @@ Respond with JSON only in this exact shape:
     if (val) values[key] = val;
   }
   if (Object.keys(values).length === 0) {
+    if (keys.every(isOptionalNameKey)) {
+      return { values: {} };
+    }
     throw httpError(502, 'AI returned empty field values');
   }
   return { values };
+}
+
+function normalizeProposalBody(raw) {
+  if (raw == null || typeof raw !== 'string' || !raw.trim()) {
+    throw httpError(400, 'body is required');
+  }
+  const trimmed = raw.trim();
+  if (trimmed.length > MAX_PROPOSAL_BODY_LENGTH) {
+    throw httpError(
+      400,
+      `body must be at most ${MAX_PROPOSAL_BODY_LENGTH} characters`,
+    );
+  }
+  return trimmed;
+}
+
+async function rewriteProposalLanguage({ body, language }) {
+  const lang = normalizeLanguage(language);
+  const text = normalizeProposalBody(body);
+  if (lang !== 'arabic') {
+    return { body: text };
+  }
+
+  const prompt = `You rewrite an Upwork cover letter into everyday Arabic.
+
+${languageInstructions('arabic')}
+
+Rules:
+- Translate the WHOLE letter into Arabic. Do not leave English sentences (except project names and URLs).
+- Keep the same paragraph structure and the same facts. Do not invent new claims, metrics, apps, or features.
+- Collapse doubled greetings: "Hi مرحبا،" or "Hi there," → "مرحبا،" only. Do not keep both.
+- Collapse doubled sign-offs: "Best," plus "مع التحية،" → "مع التحية،" only. Do not invent a freelancer name.
+- If leftover [bracket] placeholders remain, fill them in Arabic from this letter's context, or drop name/sign-off tokens like [Your Name].
+- Keep project names and URLs in their original form.
+
+Letter:
+"""
+${text}
+"""
+
+Respond with JSON only in this exact shape:
+{
+  "body": "full proposal cover letter text, entirely in Arabic"
+}`;
+
+  const result = await geminiClient.generateJson(prompt);
+  const rewritten = String(result.body || '').trim();
+  if (!rewritten) {
+    throw httpError(502, 'AI returned an empty proposal body');
+  }
+  return { body: rewritten };
 }
 
 module.exports = {
@@ -560,6 +652,7 @@ module.exports = {
   draftProposal,
   draftProposalFromTemplate,
   fillTemplateFields,
+  rewriteProposalLanguage,
   ALLOWED_DOMAINS,
   MAX_JOB_DESCRIPTION_LENGTH,
 };

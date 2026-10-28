@@ -1,7 +1,45 @@
 const { toIso } = require('./User');
 
+const STATUS_ORDER = [
+  'submitted',
+  'viewed',
+  'responded',
+  'hired',
+  'rejected',
+];
+
+const ALLOWED_STATUSES = new Set(STATUS_ORDER);
+
+function parseStatuses(value) {
+  if (Array.isArray(value)) {
+    return value.map(String);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed) ? parsed.map(String) : [trimmed];
+      } catch (_) {
+        return [trimmed];
+      }
+    }
+    return [trimmed];
+  }
+  return [];
+}
+
+function normalizeStatuses(statuses) {
+  const present = new Set(
+    parseStatuses(statuses).filter((status) => ALLOWED_STATUSES.has(status)),
+  );
+  return STATUS_ORDER.filter((status) => present.has(status));
+}
+
 function fromRow(row) {
   if (!row) return null;
+  const statuses = normalizeStatuses(row.status);
   return {
     id: row.id,
     title: row.title,
@@ -9,10 +47,11 @@ function fromRow(row) {
     jobUrl: row.job_url,
     body: row.body,
     language: row.language,
-    status: row.status,
+    status: statuses.length > 0 ? statuses : ['submitted'],
     projectType: row.project_type,
     templateId: row.template_id,
     notes: row.notes,
+    updatedVersion: row.updated_version,
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
     submittedAt: toIso(row.submitted_at),
@@ -21,16 +60,18 @@ function fromRow(row) {
 }
 
 function toDbColumns(payload) {
+  const statuses = normalizeStatuses(payload.status);
   return {
     title: payload.title,
     client_name: payload.clientName ?? null,
     job_url: payload.jobUrl ?? null,
     body: payload.body,
     language: payload.language,
-    status: payload.status,
+    status: JSON.stringify(statuses.length > 0 ? statuses : ['submitted']),
     project_type: payload.projectType,
     template_id: payload.templateId ?? null,
     notes: payload.notes ?? null,
+    updated_version: payload.updatedVersion ?? null,
     created_at: toMysqlDatetime(payload.createdAt),
     updated_at: toMysqlDatetime(payload.updatedAt),
     submitted_at: toMysqlDatetime(payload.submittedAt),
@@ -45,6 +86,8 @@ function toMysqlDatetime(value) {
 }
 
 module.exports = {
+  ALLOWED_STATUSES,
+  normalizeStatuses,
   fromRow,
   toDbColumns,
   toMysqlDatetime,

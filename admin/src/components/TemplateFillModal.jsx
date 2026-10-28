@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fillTemplateFields } from '../api/ai';
+import { fillTemplateFields, rewriteProposalLanguage } from '../api/ai';
 import {
   applyPlaceholders,
   extractPlaceholders,
   isClientNamePlaceholder,
+  isOptionalNamePlaceholder,
   placeholderLabel,
+  stripOptionalNamePlaceholders,
 } from '../utils/templatePlaceholders';
 
 function initialValues(keys, clientName) {
@@ -43,7 +45,11 @@ export default function TemplateFillModal({
 
   if (!open) return null;
 
-  const emptyKeys = keys.filter((key) => !String(values[key] || '').trim());
+  const emptyKeys = keys.filter((key) => {
+    if (String(values[key] || '').trim()) return false;
+    if (isOptionalNamePlaceholder(key)) return false;
+    return true;
+  });
 
   function setValue(key, value) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -94,8 +100,27 @@ export default function TemplateFillModal({
     }
   }
 
-  function handleApply() {
-    onApply(applyPlaceholders(templateBody, values));
+  async function handleApply() {
+    let assembled = stripOptionalNamePlaceholders(
+      applyPlaceholders(templateBody, values),
+    );
+    if (language === 'arabic') {
+      setBusy(true);
+      setError('');
+      try {
+        const result = await rewriteProposalLanguage({
+          body: assembled,
+          language,
+        });
+        assembled = String(result?.body || '').trim() || assembled;
+      } catch (err) {
+        setError(err.message || 'Could not rewrite to Arabic');
+        setBusy(false);
+        return;
+      }
+      setBusy(false);
+    }
+    onApply(assembled);
   }
 
   return (
@@ -107,7 +132,12 @@ export default function TemplateFillModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h3>Fill template fields</h3>
-        <p>Type values yourself, or use AI for the empty ones.</p>
+        <p>
+          Type values yourself, or use AI for the empty ones.
+          {language === 'arabic'
+            ? ' The generated letter will be rewritten fully in Arabic.'
+            : ''}
+        </p>
         {error ? <div className="alert alert-error">{error}</div> : null}
 
         <label className="field">

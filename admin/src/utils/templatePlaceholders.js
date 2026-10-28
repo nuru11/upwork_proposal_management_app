@@ -38,6 +38,21 @@ export function isClientNamePlaceholder(token) {
   return String(token).toLowerCase().includes('client name');
 }
 
+export function isOptionalNamePlaceholder(token) {
+  const t = String(token).toLowerCase();
+  return t.includes('client name') || t.includes('your name');
+}
+
+/** Drop unused client/sign-off tokens so "مرحبا [Client Name]," becomes "مرحبا،". */
+export function stripOptionalNamePlaceholders(body) {
+  let out = String(body || '');
+  out = out.replace(/\[[^\]]*(?:client name|your name)[^\]]*\]/gi, '');
+  out = out.replace(/مرحبا\s*,/g, 'مرحبا،');
+  out = out.replace(/Hi\s*,/g, 'Hi,');
+  out = out.replace(/[ \t]{2,}/g, ' ');
+  return out;
+}
+
 /** Ordered `{ text }` / `{ token }` segments for inline rendering. */
 export function splitTemplate(body) {
   const text = String(body || '');

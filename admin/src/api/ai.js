@@ -34,3 +34,10 @@ export function fillTemplateFields(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export function rewriteProposalLanguage(payload) {
+  return api('/ai/rewrite-proposal-language', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

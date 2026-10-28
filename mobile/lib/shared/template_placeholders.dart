@@ -59,3 +59,20 @@ String placeholderLabel(String token) {
 bool isClientNamePlaceholder(String token) {
   return token.toLowerCase().contains('client name');
 }
+
+bool isOptionalNamePlaceholder(String token) {
+  final t = token.toLowerCase();
+  return t.contains('client name') || t.contains('your name');
+}
+
+/// Drop unused client/sign-off tokens so "مرحبا [Client Name]," becomes "مرحبا،".
+String stripOptionalNamePlaceholders(String body) {
+  var out = body.replaceAll(
+    RegExp(r'\[[^\]]*(?:client name|your name)[^\]]*\]', caseSensitive: false),
+    '',
+  );
+  out = out.replaceAll(RegExp(r'مرحبا\s*,'), 'مرحبا،');
+  out = out.replaceAll(RegExp(r'Hi\s*,'), 'Hi,');
+  out = out.replaceAll(RegExp(r'[ \t]{2,}'), ' ');
+  return out;
+}

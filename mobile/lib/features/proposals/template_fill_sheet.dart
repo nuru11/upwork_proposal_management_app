@@ -82,8 +82,10 @@ class _TemplateFillSheetState extends ConsumerState<TemplateFillSheet> {
         for (final key in _keys) key: _controllers[key]!.text.trim(),
       };
 
-  List<String> get _emptyKeys =>
-      _keys.where((key) => _controllers[key]!.text.trim().isEmpty).toList();
+  List<String> get _emptyKeys => _keys
+      .where((key) => _controllers[key]!.text.trim().isEmpty)
+      .where((key) => !isOptionalNamePlaceholder(key))
+      .toList();
 
   Map<String, String> get _filled => {
         for (final entry in _values.entries)
@@ -139,11 +141,34 @@ class _TemplateFillSheetState extends ConsumerState<TemplateFillSheet> {
     }
   }
 
-  void _apply() {
-    Navigator.pop(
-      context,
+  Future<void> _apply() async {
+    var assembled = stripOptionalNamePlaceholders(
       applyPlaceholders(widget.templateBody, _values),
     );
+    if (widget.language == 'arabic') {
+      setState(() {
+        _busy = true;
+        _error = null;
+      });
+      try {
+        final rewritten = await ref.read(aiApiProvider).rewriteProposalLanguage(
+              body: assembled,
+              language: widget.language,
+            );
+        if (rewritten.trim().isNotEmpty) {
+          assembled = rewritten.trim();
+        }
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _error = e.toString().replaceFirst('Exception: ', '');
+        });
+        return;
+      }
+    }
+    if (!mounted) return;
+    Navigator.pop(context, assembled);
   }
 
   @override

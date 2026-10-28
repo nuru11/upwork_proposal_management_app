@@ -325,8 +325,18 @@ class ProposalsNotifier extends AsyncNotifier<List<Proposal>> {
   }
 
   Future<void> updateStatus(Proposal proposal, ProposalStatus status) async {
+    final next = List<ProposalStatus>.from(proposal.status);
+    if (next.contains(status)) {
+      if (next.length == 1) return;
+      next.remove(status);
+    } else {
+      next.add(status);
+    }
     final updated = proposal.copyWith(
-      status: status,
+      status: [
+        for (final value in ProposalStatus.values)
+          if (next.contains(value)) value,
+      ],
       updatedAt: DateTime.now(),
     );
     await ref.read(proposalRepositoryProvider).update(updated);

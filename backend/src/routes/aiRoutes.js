@@ -10,5 +10,6 @@ router.post('/suggest-solutions', aiController.suggestSolutions);
 router.post('/draft-proposal', aiController.draftProposal);
 router.post('/draft-proposal-from-template', aiController.draftProposalFromTemplate);
 router.post('/fill-template-fields', aiController.fillTemplateFields);
+router.post('/rewrite-proposal-language', aiController.rewriteProposalLanguage);
 
 module.exports = router;

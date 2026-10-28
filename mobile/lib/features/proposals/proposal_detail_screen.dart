@@ -122,7 +122,9 @@ class ProposalDetailScreen extends ConsumerWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  StatusChip(status: proposal.status),
+                  ...proposal.status.map(
+                    (status) => StatusChip(status: status),
+                  ),
                   LanguageChip(language: proposal.language),
                   ProjectTypeChip(projectType: proposal.projectType),
                 ],
@@ -158,8 +160,8 @@ class ProposalDetailScreen extends ConsumerWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: ProposalStatus.values.map((status) {
-                  final selected = proposal.status == status;
-                  return ChoiceChip(
+                  final selected = proposal.status.contains(status);
+                  return FilterChip(
                     label: Text(status.label),
                     selected: selected,
                     selectedColor: AppTheme.statusSoftColor(status),
@@ -169,11 +171,9 @@ class ProposalDetailScreen extends ConsumerWidget {
                           : AppColors.slate700,
                       fontWeight: FontWeight.w600,
                     ),
-                    onSelected: selected
-                        ? null
-                        : (_) => ref
-                            .read(proposalsProvider.notifier)
-                            .updateStatus(proposal, status),
+                    onSelected: (_) => ref
+                        .read(proposalsProvider.notifier)
+                        .updateStatus(proposal, status),
                     showCheckmark: false,
                   );
                 }).toList(),
@@ -204,15 +204,8 @@ class ProposalDetailScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-              if (proposal.notes != null && proposal.notes!.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                Text(
-                  'Notes',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(proposal.notes!),
-              ],
+              const SizedBox(height: 20),
+              _ReviewFields(proposal: proposal),
               const SizedBox(height: 24),
               Text(
                 'Details',
@@ -247,6 +240,179 @@ class ProposalDetailScreen extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _ReviewFields extends ConsumerStatefulWidget {
+  const _ReviewFields({required this.proposal});
+
+  final Proposal proposal;
+
+  @override
+  ConsumerState<_ReviewFields> createState() => _ReviewFieldsState();
+}
+
+class _ReviewFieldsState extends ConsumerState<_ReviewFields> {
+  late final TextEditingController _notesController;
+  late final TextEditingController _versionController;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _notesController = TextEditingController(text: widget.proposal.notes ?? '');
+    _versionController = TextEditingController(
+      text: widget.proposal.updatedVersion ?? '',
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReviewFields oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.proposal.id != widget.proposal.id) {
+      _notesController.text = widget.proposal.notes ?? '';
+      _versionController.text = widget.proposal.updatedVersion ?? '';
+      return;
+    }
+    final notes = widget.proposal.notes ?? '';
+    if (oldWidget.proposal.notes != widget.proposal.notes &&
+        _notesController.text != notes) {
+      _notesController.text = notes;
+    }
+    final version = widget.proposal.updatedVersion ?? '';
+    if (oldWidget.proposal.updatedVersion != widget.proposal.updatedVersion &&
+        _versionController.text != version) {
+      _versionController.text = version;
+    }
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    _versionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final notes = _notesController.text.trim();
+    final version = _versionController.text.trim();
+    final updated = widget.proposal.copyWith(
+      notes: notes.isEmpty ? null : notes,
+      clearNotes: notes.isEmpty,
+      updatedVersion: version.isEmpty ? null : version,
+      clearUpdatedVersion: version.isEmpty,
+      updatedAt: DateTime.now(),
+    );
+    try {
+      await ref.read(proposalsProvider.notifier).save(
+            updated,
+            isNew: false,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saved')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _copyVersion() async {
+    final text = _versionController.text;
+    if (text.trim().isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Updated version copied')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isRtl = widget.proposal.language == ProposalLanguage.arabic;
+
+    return Directionality(
+      textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Notes',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'How to improve this proposal, or its weaknesses.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.slate500,
+                ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _notesController,
+            minLines: 3,
+            maxLines: 6,
+            decoration: const InputDecoration(
+              alignLabelWithHint: true,
+              hintText: 'Write a note',
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Updated version',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _versionController.text.trim().isEmpty
+                    ? null
+                    : _copyVersion,
+                icon: const Icon(Icons.copy_outlined, size: 18),
+                label: const Text('Copy'),
+              ),
+            ],
+          ),
+          Text(
+            'The improved proposal.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.slate500,
+                ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _versionController,
+            minLines: 6,
+            maxLines: 14,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              alignLabelWithHint: true,
+              hintText: 'Write the improved proposal',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              onPressed: _saving ? null : _save,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.teal,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(_saving ? 'Saving…' : 'Save'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
