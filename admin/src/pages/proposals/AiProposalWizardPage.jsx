@@ -520,6 +520,9 @@ export default function AiProposalWizardPage() {
       state: {
         formSnapshot,
         aiBody: body,
+        ...(jobDescription.trim()
+          ? { jobDescription: jobDescription.trim() }
+          : {}),
       },
     });
   }

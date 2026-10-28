@@ -672,7 +672,14 @@ class _AiProposalWizardScreenState
       setState(() => _error = 'Draft is empty.');
       return;
     }
-    context.pop(AiWizardResult(body: body));
+    context.pop(
+      AiWizardResult(
+        body: body,
+        jobDescription: _jobController.text.trim().isEmpty
+            ? null
+            : _jobController.text.trim(),
+      ),
+    );
   }
 
   Future<void> _saveAiDraft() async {

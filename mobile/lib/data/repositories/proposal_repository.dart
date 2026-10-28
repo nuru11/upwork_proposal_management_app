@@ -32,9 +32,11 @@ class ProposalRepository {
       args.add(projectType.name);
     }
     if (search != null && search.trim().isNotEmpty) {
-      where.add('(title LIKE ? OR client_name LIKE ? OR body LIKE ?)');
+      where.add(
+        '(title LIKE ? OR client_name LIKE ? OR body LIKE ? OR job_description LIKE ?)',
+      );
       final q = '%${search.trim()}%';
-      args.addAll([q, q, q]);
+      args.addAll([q, q, q, q]);
     }
 
     final rows = await _db.query(

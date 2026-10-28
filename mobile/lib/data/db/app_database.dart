@@ -12,7 +12,7 @@ class AppDatabase {
   Database get database => _db;
 
   static const _dbName = 'proposal_manager.db';
-  static const _dbVersion = 11;
+  static const _dbVersion = 12;
 
   static Future<AppDatabase> open() async {
     if (kIsWeb) {
@@ -55,6 +55,7 @@ class AppDatabase {
         title TEXT NOT NULL,
         client_name TEXT,
         job_url TEXT,
+        job_description TEXT,
         body TEXT NOT NULL,
         language TEXT NOT NULL,
         status TEXT NOT NULL,
@@ -129,6 +130,20 @@ class AppDatabase {
     }
     if (oldVersion < 11) {
       await _addProposalUpdatedVersionColumn(db);
+    }
+    if (oldVersion < 12) {
+      await _addProposalJobDescriptionColumn(db);
+    }
+  }
+
+  static Future<void> _addProposalJobDescriptionColumn(Database db) async {
+    final info = await db.rawQuery('PRAGMA table_info(proposals)');
+    final hasJobDescription =
+        info.any((row) => row['name'] == 'job_description');
+    if (!hasJobDescription) {
+      await db.execute(
+        'ALTER TABLE proposals ADD COLUMN job_description TEXT',
+      );
     }
   }
 

@@ -82,7 +82,7 @@ export default function ProposalsListPage() {
 
       <form className="filters" onSubmit={applyFilters}>
         <input
-          placeholder="Search title, client, body…"
+          placeholder="Search title, client, body, job…"
           value={filters.search}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
         />

@@ -184,6 +184,12 @@ export default function ProposalDetailPage() {
 
       <div className="detail-grid">
         <div className="detail-main">
+          {item.jobDescription ? (
+            <div className="detail-card">
+              <h2>Job description</h2>
+              <pre className="body-pre">{item.jobDescription}</pre>
+            </div>
+          ) : null}
           <div className="detail-card">
             <div className="detail-card-header">
               <h2>Proposal body</h2>

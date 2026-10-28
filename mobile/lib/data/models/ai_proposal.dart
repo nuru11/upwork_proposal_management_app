@@ -151,9 +151,10 @@ class AiWizardArgs {
 }
 
 class AiWizardResult {
-  const AiWizardResult({required this.body});
+  const AiWizardResult({required this.body, this.jobDescription});
 
   final String body;
+  final String? jobDescription;
 }
 
 class AiProjectMention {

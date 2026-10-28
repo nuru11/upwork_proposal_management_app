@@ -20,6 +20,7 @@ const blank = {
   title: '',
   clientName: '',
   jobUrl: '',
+  jobDescription: '',
   body: '',
   language: 'english',
   status: ['submitted'],
@@ -39,10 +40,12 @@ export default function ProposalFormPage() {
   const [form, setForm] = useState(() => {
     const snap = location.state?.formSnapshot;
     const aiBody = location.state?.aiBody;
-    if (!snap && !aiBody) return blank;
+    const jobDescription = location.state?.jobDescription;
+    if (!snap && !aiBody && !jobDescription) return blank;
     const next = {
       ...(snap || blank),
       ...(aiBody ? { body: aiBody } : {}),
+      ...(jobDescription ? { jobDescription } : {}),
     };
     return { ...next, status: statusList(next.status) };
   });
@@ -92,6 +95,7 @@ export default function ProposalFormPage() {
             title: item.title || '',
             clientName: item.clientName || '',
             jobUrl: item.jobUrl || '',
+            jobDescription: item.jobDescription || '',
             body: item.body || '',
             language: item.language || 'english',
             status: statusList(item.status),
@@ -185,6 +189,7 @@ export default function ProposalFormPage() {
       title: form.title.trim(),
       clientName: form.clientName.trim() || null,
       jobUrl: form.jobUrl.trim() || null,
+      jobDescription: (form.jobDescription || '').trim() || null,
       body: form.body,
       language: form.language,
       status: form.status,
@@ -277,6 +282,16 @@ export default function ProposalFormPage() {
             />
           </label>
         </div>
+
+        <label className="field">
+          <span>Job description</span>
+          <textarea
+            rows={6}
+            value={form.jobDescription || ''}
+            onChange={(e) => setField('jobDescription', e.target.value)}
+            placeholder="Paste the Upwork job posting"
+          />
+        </label>
 
         <fieldset className="field">
           <legend>Status</legend>

@@ -77,7 +77,7 @@ class _ProposalsListScreenState extends ConsumerState<ProposalsListScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search by title, client, or text…',
+                hintText: 'Search by title, client, text, or job…',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: filter.search.isNotEmpty
                     ? IconButton(

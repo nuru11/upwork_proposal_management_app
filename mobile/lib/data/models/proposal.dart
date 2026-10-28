@@ -112,6 +112,7 @@ class Proposal {
     required this.title,
     this.clientName,
     this.jobUrl,
+    this.jobDescription,
     required this.body,
     required this.language,
     required this.status,
@@ -128,6 +129,7 @@ class Proposal {
   final String title;
   final String? clientName;
   final String? jobUrl;
+  final String? jobDescription;
   final String body;
   final ProposalLanguage language;
   final List<ProposalStatus> status;
@@ -144,6 +146,7 @@ class Proposal {
     String? title,
     String? clientName,
     String? jobUrl,
+    String? jobDescription,
     String? body,
     ProposalLanguage? language,
     List<ProposalStatus>? status,
@@ -156,6 +159,7 @@ class Proposal {
     DateTime? submittedAt,
     bool clearClientName = false,
     bool clearJobUrl = false,
+    bool clearJobDescription = false,
     bool clearTemplateId = false,
     bool clearNotes = false,
     bool clearUpdatedVersion = false,
@@ -166,6 +170,9 @@ class Proposal {
       title: title ?? this.title,
       clientName: clearClientName ? null : (clientName ?? this.clientName),
       jobUrl: clearJobUrl ? null : (jobUrl ?? this.jobUrl),
+      jobDescription: clearJobDescription
+          ? null
+          : (jobDescription ?? this.jobDescription),
       body: body ?? this.body,
       language: language ?? this.language,
       status: status ?? this.status,
@@ -187,6 +194,7 @@ class Proposal {
       'title': title,
       'client_name': clientName,
       'job_url': jobUrl,
+      'job_description': jobDescription,
       'body': body,
       'language': language.name,
       'status': ProposalStatus.listToStorage(status),
@@ -206,6 +214,7 @@ class Proposal {
       title: map['title'] as String,
       clientName: map['client_name'] as String?,
       jobUrl: map['job_url'] as String?,
+      jobDescription: map['job_description'] as String?,
       body: map['body'] as String,
       language: ProposalLanguage.fromStorage(map['language'] as String),
       status: ProposalStatus.listFromStorage(map['status']),
@@ -229,6 +238,7 @@ class Proposal {
       'title': title,
       'clientName': clientName,
       'jobUrl': jobUrl,
+      'jobDescription': jobDescription,
       'body': body,
       'language': language.name,
       'status': status.map((item) => item.name).toList(),
@@ -248,6 +258,7 @@ class Proposal {
       title: json['title'] as String,
       clientName: json['clientName'] as String?,
       jobUrl: json['jobUrl'] as String?,
+      jobDescription: json['jobDescription'] as String?,
       body: json['body'] as String,
       language: ProposalLanguage.fromStorage(json['language'] as String),
       status: ProposalStatus.listFromStorage(json['status']),

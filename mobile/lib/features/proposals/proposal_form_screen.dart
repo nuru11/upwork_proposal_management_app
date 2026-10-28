@@ -29,6 +29,7 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
   final _titleController = TextEditingController();
   final _clientController = TextEditingController();
   final _urlController = TextEditingController();
+  final _jobDescriptionController = TextEditingController();
   final _bodyController = TextEditingController();
   final _notesController = TextEditingController();
 
@@ -62,6 +63,7 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
     _titleController.dispose();
     _clientController.dispose();
     _urlController.dispose();
+    _jobDescriptionController.dispose();
     _bodyController.dispose();
     _notesController.dispose();
     super.dispose();
@@ -72,6 +74,7 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
     _titleController.text = proposal.title;
     _clientController.text = proposal.clientName ?? '';
     _urlController.text = proposal.jobUrl ?? '';
+    _jobDescriptionController.text = proposal.jobDescription ?? '';
     _bodyController.text = proposal.body;
     _notesController.text = proposal.notes ?? '';
     _language = proposal.language;
@@ -215,6 +218,10 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
     if (result == null || !mounted) return;
     setState(() {
       _bodyController.text = result.body;
+      final job = result.jobDescription;
+      if (job != null && job.isNotEmpty) {
+        _jobDescriptionController.text = job;
+      }
     });
   }
 
@@ -232,6 +239,9 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
       jobUrl: _urlController.text.trim().isEmpty
           ? null
           : _urlController.text.trim(),
+      jobDescription: _jobDescriptionController.text.trim().isEmpty
+          ? null
+          : _jobDescriptionController.text.trim(),
       body: _bodyController.text.trim(),
       language: _language,
       status: _statuses,
@@ -393,6 +403,17 @@ class _ProposalFormScreenState extends ConsumerState<ProposalFormScreen> {
                 hintText: 'https://www.upwork.com/jobs/...',
               ),
               keyboardType: TextInputType.url,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _jobDescriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Job description',
+                alignLabelWithHint: true,
+                hintText: 'Paste the Upwork job posting',
+              ),
+              minLines: 4,
+              maxLines: 10,
             ),
             const SizedBox(height: 16),
             Text(

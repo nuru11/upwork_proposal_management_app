@@ -179,6 +179,31 @@ class ProposalDetailScreen extends ConsumerWidget {
                 }).toList(),
               ),
               const SizedBox(height: 24),
+              if (proposal.jobDescription != null &&
+                  proposal.jobDescription!.isNotEmpty) ...[
+                Text(
+                  'Job description',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.slate200),
+                  ),
+                  child: SelectableText(
+                    proposal.jobDescription!,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: AppColors.ink,
+                          height: 1.55,
+                        ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
               Text(
                 'Proposal text',
                 style: Theme.of(context).textTheme.titleMedium,

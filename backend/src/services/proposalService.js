@@ -36,9 +36,11 @@ async function list(userId, { status, language, projectType, search } = {}) {
     params.push(projectType);
   }
   if (search && search.trim()) {
-    where.push('(title LIKE ? OR client_name LIKE ? OR body LIKE ?)');
+    where.push(
+      '(title LIKE ? OR client_name LIKE ? OR body LIKE ? OR job_description LIKE ?)',
+    );
     const q = `%${search.trim()}%`;
-    params.push(q, q, q);
+    params.push(q, q, q, q);
   }
 
   const rows = await query(
@@ -78,14 +80,15 @@ async function create(userId, payload) {
 
   await query(
     `INSERT INTO proposals (
-      id, user_id, title, client_name, job_url, body, language, status,
-      project_type, template_id, notes, updated_version, created_at, updated_at,
-      submitted_at, deleted_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+      id, user_id, title, client_name, job_url, job_description, body, language,
+      status, project_type, template_id, notes, updated_version, created_at,
+      updated_at, submitted_at, deleted_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
     ON DUPLICATE KEY UPDATE
       title = VALUES(title),
       client_name = VALUES(client_name),
       job_url = VALUES(job_url),
+      job_description = VALUES(job_description),
       body = VALUES(body),
       language = VALUES(language),
       status = VALUES(status),
@@ -102,6 +105,7 @@ async function create(userId, payload) {
       cols.title,
       cols.client_name,
       cols.job_url,
+      cols.job_description,
       cols.body,
       cols.language,
       cols.status,
@@ -139,14 +143,15 @@ async function update(userId, id, payload) {
 
   await query(
     `UPDATE proposals SET
-      title = ?, client_name = ?, job_url = ?, body = ?, language = ?,
-      status = ?, project_type = ?, template_id = ?, notes = ?,
+      title = ?, client_name = ?, job_url = ?, job_description = ?, body = ?,
+      language = ?, status = ?, project_type = ?, template_id = ?, notes = ?,
       updated_version = ?, updated_at = ?, submitted_at = ?, deleted_at = NULL
      WHERE id = ? AND user_id = ?`,
     [
       cols.title,
       cols.client_name,
       cols.job_url,
+      cols.job_description,
       cols.body,
       cols.language,
       cols.status,
